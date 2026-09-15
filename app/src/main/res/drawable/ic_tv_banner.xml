@@ -1,0 +1,27 @@
+﻿<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+    <!-- Background -->
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M0,0h320v180h-320z" />
+    <!-- Gradient accent circle -->
+    <path
+        android:fillColor="#161B22"
+        android:pathData="M160,90m-70,0a70,70 0,1,1 140,0a70,70 0,1,1 -140,0" />
+    <!-- TV Icon Body -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M160,52L148,38M160,52L172,38M120,55h80c6,0 11,5 11,11v50c0,6 -5,11 -11,11h-80c-6,0 -11,-5 -11,-11v-50c0,-6 5,-11 11,-11z"
+        android:strokeWidth="4"
+        android:strokeColor="#00E5FF" />
+    <path
+        android:fillColor="#0D1117"
+        android:pathData="M126,62h68c3,0 5,2 5,5v38c0,3 -2,5 -5,5h-68c-3,0 -5,-2 -5,-5v-38c0,-3 2,-5 5,-5z" />
+    <!-- Play Triangle -->
+    <path
+        android:fillColor="#00E5FF"
+        android:pathData="M154,72l18,14l-18,14z" />
+</vector>

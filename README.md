@@ -1,41 +1,60 @@
-# Merlin TV
+﻿# Merlin TV
 
-Android/Android TV IPTV and public-media app rebuilt from the behaviour of the supplied Merlin Media APK.
+Modern Android and Android TV IPTV and streaming application built with Jetpack Compose and Media3/ExoPlayer.
 
-## Included
+## ✨ Features & Overhaul Highlights
 
-- UK and USA live-TV catalogues loaded at runtime from the public `iptv-org` country playlists.
-- Media3/ExoPlayer playback for HLS and ordinary HTTP(S) video.
-- A small starter Movies/Series catalogue using openly reachable demo/open-film streams.
-- GitHub Release update checking for `merlinthedev848/merlin-tv`.
-- In-app APK download followed by the normal Android package-installer confirmation.
-- Android TV launcher support and landscape-first UI.
+- **Live TV Catalogs**: Real-time loading from public UK and USA `iptv-org` playlists, complete with channel logos (`tvg-logo`), groups/categories, and metadata.
+- **D-Pad & Remote Navigation**: Full Android TV remote control support with glowing focus rings, smooth scaling animations, and D-pad click handlers.
+- **Channel Surfing & OSD**: Previous / Next channel jumping while in full-screen playback, play/pause controls, and aspect ratio cycling (Fit, Zoom, Stretch).
+- **Favorites & History**: Bookmark favorite channels and automatically track recently watched streams with persistent local storage.
+- **Search & Filter**: Real-time channel search by name, group, or country, along with dynamic category pill filters (News, Sports, Entertainment, Movies, etc.).
+- **Software Update Checker**: Built-in "Check Updates" button that directly queries `https://api.github.com/repos/merlinthedev848/merlin-tv/releases/latest`, parses changelogs, downloads the latest APK in-app with a progress indicator, and launches the Android package installer.
+- **Custom Playlists**: Add and manage custom M3U/M3U8 playlist URLs with custom labels and automatic cache refresh.
+- **Resilient Playback**: Spoofed User-Agent headers to prevent HTTP 403 Forbidden errors on public streams, auto-buffering spinner, and automatic retry/skip overlays on stream errors.
 
-## Update model
+## 🚀 Building & Releasing
 
-The app checks:
+### Local Build
+```bash
+./gradlew assembleDebug
+```
 
-`https://api.github.com/repos/merlinthedev848/merlin-tv/releases/latest`
+### GitHub Actions Release
+1. Configure repository secrets if signing with a private keystore:
+   - `MERLIN_KEYSTORE_BASE64`
+   - `MERLIN_KEYSTORE_PASSWORD`
+   - `MERLIN_KEY_ALIAS`
+   - `MERLIN_KEY_PASSWORD`
+2. Push a semantic tag (e.g. `v1.2.1`):
+   ```bash
+   git tag v1.2.1
+   git push origin v1.2.1
+   ```
+3. GitHub Actions builds the release/debug APK and attaches it to the GitHub release.
 
-The latest release should have a semantic tag such as `v1.2.1` and contain an `.apk` asset. The repository/release endpoint must be publicly readable; do **not** embed a GitHub PAT in the APK for a private repository.
+## 📱 App Architecture
 
-Android normally requires the user to approve installation of a sideloaded update. The app cannot silently replace itself on a normal unmanaged device.
-
-### Signing is critical
-
-Every update APK must use the **same signing certificate** as the APK already installed. If the original `merlin_media_1.1.0.apk` was signed with a key you control, configure CI with that key. If you do not have the original signing key, Android will not accept this rebuilt app as an update to 1.1.0; uninstall the old package once and install the rebuilt app, then keep the new signing key for all future releases.
-
-## GitHub Actions signing secrets
-
-For release builds, configure these repository secrets:
-
-- `MERLIN_KEYSTORE_BASE64` — base64 of the JKS/keystore
-- `MERLIN_KEYSTORE_PASSWORD`
-- `MERLIN_KEY_ALIAS`
-- `MERLIN_KEY_PASSWORD`
-
-Then push a tag such as `v1.2.0`. The release workflow builds and attaches the signed APK.
-
-## Content policy
-
-Keep sources to broadcaster-authorised, public-domain, Creative Commons/openly licensed, or other legitimately public streams. Playlist entries can disappear or be geo-restricted; the app should treat individual stream failures as normal.
+```
+app/src/main/java/com/example/merlinmedia/
+├── MainActivity.kt               # Main entry point and app router
+├── model/
+│   └── MediaModels.kt           # Data classes for channels, updates, and playback
+├── data/
+│   ├── CatalogRepository.kt     # Multi-source M3U loader & sample catalogs
+│   ├── FavoritesManager.kt      # SharedPreferences persistence for favorites & history
+│   └── M3uParser.kt             # Robust regex-based M3U parser with logo & group extraction
+├── updater/
+│   └── UpdateManager.kt         # GitHub Release checker, progress downloader & APK installer
+└── ui/
+    ├── theme/
+    │   └── Theme.kt             # Obsidian & Cyan dark theme for TV
+    ├── components/
+    │   └── TvComponents.kt      # Focusable cards, channel rows, category chips, search bar
+    ├── screens/
+    │   ├── HomeScreen.kt        # Tab navigation, category filter, channel grid
+    │   └── PlayerScreen.kt      # Media3 ExoPlayer with OSD, channel surfing & aspect toggle
+    └── dialogs/
+        ├── UpdateDialog.kt      # Interactive GitHub update checker & installer
+        └── SettingsDialog.kt    # Custom M3U playlist manager & app details
+```
