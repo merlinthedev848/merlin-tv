@@ -65,11 +65,11 @@ fun UpdateDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(12.dp),
             colors = CardDefaults.cardColors(containerColor = SurfaceDark),
             modifier = Modifier
                 .fillMaxWidth(0.92f)
-                .border(1.dp, CardSurface, RoundedCornerShape(16.dp))
+                .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp))
         ) {
             Column(
                 modifier = Modifier
@@ -84,7 +84,7 @@ fun UpdateDialog(
                     Icon(
                         imageVector = Icons.Default.SystemUpdate,
                         contentDescription = null,
-                        tint = PrimaryCyan,
+                        tint = AccentSky,
                         modifier = Modifier.size(32.dp)
                     )
                     Column {
@@ -103,7 +103,7 @@ fun UpdateDialog(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = CardSurface)
+                HorizontalDivider(color = BorderSubtle)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Content based on State
@@ -113,10 +113,10 @@ fun UpdateDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 24.dp),
-                            horizontalAlignment = Alignment.CenterVertically,
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            CircularProgressIndicator(color = PrimaryCyan)
+                            CircularProgressIndicator(color = AccentSky)
                             Text("Checking GitHub repository for latest release...", color = TextSecondary)
                         }
                     }
@@ -126,14 +126,14 @@ fun UpdateDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 16.dp),
-                            horizontalAlignment = Alignment.CenterVertically,
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
                                 text = "🎉 You're running the latest version!",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PrimaryCyan
+                                color = AccentSky
                             )
                             Text(
                                 text = "Repository: github.com/${UpdateManager.GITHUB_REPO}",
@@ -158,10 +158,10 @@ fun UpdateDialog(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "New Release Available: v${info.version}",
+                                    text = "New Release: v${info.version}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
-                                    color = PrimaryCyan
+                                    color = AccentSky
                                 )
                                 if (info.releaseDate.isNotBlank()) {
                                     Text(
@@ -205,17 +205,17 @@ fun UpdateDialog(
                                 text = "Downloading Update...",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PrimaryCyan
+                                color = AccentSky
                             )
 
                             if (current.progress >= 0) {
                                 LinearProgressIndicator(
-                                    progress = { current.progress / 100f },
+                                    progress = { (current.progress / 100f).coerceIn(0f, 1f) },
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp)),
-                                    color = PrimaryCyan,
+                                    color = AccentSky,
                                     trackColor = CardSurface
                                 )
                                 val downloadedMb = current.bytesDownloaded / (1024f * 1024f)
@@ -224,7 +224,7 @@ fun UpdateDialog(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
-                                    Text("${current.progress}%", color = PrimaryCyan, fontSize = 12.sp)
+                                    Text("${current.progress}%", color = AccentSky, fontSize = 12.sp)
                                     Text(
                                         String.format("%.1f MB / %.1f MB", downloadedMb, totalMb),
                                         color = TextSecondary,
@@ -237,7 +237,7 @@ fun UpdateDialog(
                                         .fillMaxWidth()
                                         .height(8.dp)
                                         .clip(RoundedCornerShape(4.dp)),
-                                    color = PrimaryCyan
+                                    color = AccentSky
                                 )
                             }
                         }
@@ -248,14 +248,14 @@ fun UpdateDialog(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 16.dp),
-                            horizontalAlignment = Alignment.CenterVertically,
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             Text(
                                 text = "✅ Download Complete!",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
-                                color = PrimaryCyan
+                                color = AccentSky
                             )
                             Text(
                                 text = "Click 'Install Now' to launch the Android package installer.",
@@ -326,31 +326,31 @@ fun UpdateDialog(
                                         }
                                     }
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyan)
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                             ) {
-                                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.CloudDownload, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Download & Install", color = Color.Black, fontWeight = FontWeight.Bold)
+                                Text("Download & Install", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         is UpdateState.ReadyToInstall -> {
                             Button(
                                 onClick = { UpdateManager.installApk(context, current.file) },
-                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyan)
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                             ) {
-                                Text("Install Now", color = Color.Black, fontWeight = FontWeight.Bold)
+                                Text("Install Now", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
 
                         is UpdateState.Error -> {
                             Button(
                                 onClick = { runUpdateCheck() },
-                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyan)
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                             ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.Black, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Refresh, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(4.dp))
-                                Text("Retry", color = Color.Black, fontWeight = FontWeight.Bold)
+                                Text("Retry", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
 

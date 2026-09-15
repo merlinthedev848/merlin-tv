@@ -15,6 +15,8 @@ val BorderSubtle = Color(0xFF262E3E)
 val FocusRingColor = Color(0xFF38BDF8)
 val PrimaryBlue = Color(0xFF2563EB)
 val AccentSky = Color(0xFF38BDF8)
+val PrimaryCyan = Color(0xFF38BDF8)
+val SecondaryTeal = Color(0xFF0EA5E9)
 val AccentGold = Color(0xFFF59E0B)
 val LiveBadgeColor = Color(0xFFE63946)
 val ErrorRed = Color(0xFFFF334B)
@@ -22,6 +24,7 @@ val TextPrimary = Color(0xFFF1F5F9)
 val TextSecondary = Color(0xFF94A3B8)
 val TextMuted = Color(0xFF64748B)
 val SolidBarBg = Color(0xFF10141E)
+val FocusedBorderColor = FocusRingColor
 
 private val DarkColorScheme = darkColorScheme(
     primary = AccentSky,

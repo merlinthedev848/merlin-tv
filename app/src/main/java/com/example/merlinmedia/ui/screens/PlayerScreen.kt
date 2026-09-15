@@ -15,7 +15,7 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -42,7 +42,7 @@ import com.example.merlinmedia.model.AspectRatioMode
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.player.ExoPlayerHelper
-import com.example.merlinmedia.ui.components.ChannelCard
+import com.example.merlinmedia.ui.components.ChannelGridCard
 import com.example.merlinmedia.ui.components.TvSearchBar
 import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.delay
@@ -266,11 +266,10 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Buffering Indicator (Solid clean badge)
+        // Buffering Indicator
         if (isBuffering && errorMessage == null) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize(),
+                modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Card(
@@ -284,7 +283,7 @@ fun PlayerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        CircularProgressIndicator(color = PrimaryCyan, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(color = AccentSky, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
                         Text(
                             text = "Loading Stream...",
                             color = TextPrimary,
@@ -296,7 +295,7 @@ fun PlayerScreen(
             }
         }
 
-        // Error Recovery Overlay (Solid opaque dialog)
+        // Error Recovery Overlay
         if (errorMessage != null) {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -348,11 +347,11 @@ fun PlayerScreen(
                                     },
                                     shape = RoundedCornerShape(8.dp),
                                     modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyan)
+                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
                                 ) {
-                                    Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.Black, modifier = Modifier.size(18.dp))
+                                    Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Next Channel", color = Color.Black, fontWeight = FontWeight.Bold)
+                                    Text("Next Channel", color = Color.White, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -434,14 +433,14 @@ fun PlayerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            // Mini Guide Toggle Button (Solid)
+                            // Mini Guide Toggle Button
                             Button(
                                 onClick = { showMiniGuide = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = CardSurface),
                                 shape = RoundedCornerShape(8.dp),
                                 border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle))
                             ) {
-                                Icon(Icons.Default.List, contentDescription = "Channel Guide", tint = PrimaryCyan, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.List, contentDescription = "Channel Guide", tint = AccentSky, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Channel Guide", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
@@ -515,12 +514,12 @@ fun PlayerScreen(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryCyan)
+                                    .background(PrimaryBlue)
                             ) {
                                 Icon(
                                     imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
                                     contentDescription = if (isPlaying) "Pause" else "Play",
-                                    tint = Color.Black,
+                                    tint = Color.White,
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
@@ -605,7 +604,7 @@ fun PlayerScreen(
                             text = "Channel Guide",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = PrimaryCyan
+                            color = AccentSky
                         )
                         IconButton(onClick = { showMiniGuide = false }, modifier = Modifier.size(32.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "Close", tint = TextPrimary)
@@ -632,11 +631,13 @@ fun PlayerScreen(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(filteredMiniList, key = { "${it.id}-${it.url}" }) { item ->
-                            ChannelCard(
+                        itemsIndexed(filteredMiniList, key = { index, it -> "${it.id}-${it.url}-$index" }) { index, item ->
+                            ChannelGridCard(
                                 item = item,
+                                channelNumber = 101 + index,
                                 isFavorite = favoritesManager.isFavorite(item.id),
                                 onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
+                                onFocusChange = {},
                                 onClick = {
                                     playItem(item)
                                     showMiniGuide = false
