@@ -1,4 +1,4 @@
-﻿package com.example.merlinmedia.updater
+package com.example.merlinmedia.updater
 
 import android.content.Context
 import android.content.Intent
@@ -100,29 +100,35 @@ object UpdateManager {
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
+                response.close()
                 throw IllegalStateException("Download failed with HTTP ${response.code}")
             }
 
-            val body = response.body ?: throw IllegalStateException("Empty response body from download server")
+            val body = response.body ?: run {
+                response.close()
+                throw IllegalStateException("Empty response body from download server")
+            }
             val contentLength = body.contentLength()
 
-            body.byteStream().use { input ->
-                FileOutputStream(targetFile).use { output ->
-                    val buffer = ByteArray(8192)
-                    var bytesRead: Int
-                    var totalRead: Long = 0
+            response.use {
+                body.byteStream().use { input ->
+                    FileOutputStream(targetFile).use { output ->
+                        val buffer = ByteArray(8192)
+                        var bytesRead: Int
+                        var totalRead: Long = 0
 
-                    while (input.read(buffer).also { bytesRead = it } != -1) {
-                        output.write(buffer, 0, bytesRead)
-                        totalRead += bytesRead
-                        val progress = if (contentLength > 0) {
-                            ((totalRead * 100) / contentLength).toInt()
-                        } else {
-                            -1
+                        while (input.read(buffer).also { bytesRead = it } != -1) {
+                            output.write(buffer, 0, bytesRead)
+                            totalRead += bytesRead
+                            val progress = if (contentLength > 0) {
+                                ((totalRead * 100) / contentLength).toInt()
+                            } else {
+                                -1
+                            }
+                            onProgress(progress, totalRead, contentLength)
                         }
-                        onProgress(progress, totalRead, contentLength)
+                        output.flush()
                     }
-                    output.flush()
                 }
             }
             targetFile

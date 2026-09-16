@@ -1,4 +1,4 @@
-﻿package com.example.merlinmedia.player
+package com.example.merlinmedia.player
 
 import android.content.Context
 import androidx.media3.common.AudioAttributes
@@ -8,6 +8,8 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+
+import androidx.media3.common.MediaMetadata
 
 object ExoPlayerHelper {
 
@@ -53,9 +55,15 @@ object ExoPlayerHelper {
     }
 
     fun buildMediaItem(url: String, title: String): MediaItem {
+        val metadata = MediaMetadata.Builder()
+            .setTitle(title)
+            .setDisplayTitle(title)
+            .build()
+
         return MediaItem.Builder()
             .setUri(url)
             .setMediaId(url)
+            .setMediaMetadata(metadata)
             .build()
     }
 }

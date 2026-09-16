@@ -1,4 +1,4 @@
-﻿package com.example.merlinmedia.ui.screens
+package com.example.merlinmedia.ui.screens
 
 import android.app.Activity
 import android.view.KeyEvent
@@ -18,7 +18,10 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -63,7 +66,8 @@ fun PlayerScreen(
     var showMiniGuide by remember { mutableStateOf(false) }
     var miniGuideSearch by remember { mutableStateOf("") }
     var aspectMode by remember { mutableStateOf(AspectRatioMode.FIT) }
-    var isFavorite by remember { mutableStateOf(favoritesManager.isFavorite(currentItem.id)) }
+    // Fix #2: don't initialise once from initialItem — derive from currentItem on every change
+    var isFavorite by remember { mutableStateOf(false) }
 
     val currentIndex = remember(currentItem, playlist) {
         val idx = playlist.indexOfFirst { it.url == currentItem.url }
@@ -87,7 +91,7 @@ fun PlayerScreen(
         }
     }
 
-    // Record to recent history
+    // Record to recent history and sync isFavorite immediately on channel change
     LaunchedEffect(currentItem) {
         favoritesManager.addToRecent(currentItem)
         isFavorite = favoritesManager.isFavorite(currentItem.id)
@@ -109,10 +113,13 @@ fun PlayerScreen(
         player.playWhenReady = true
     }
 
-    // Set initial item
-    LaunchedEffect(currentItem.url) {
+    // Fix #1: Only trigger initial playback once — subsequent channel changes call playItem() directly.
+    // Previously LaunchedEffect(currentItem.url) re-fired every time playItem() set currentItem,
+    // causing a double player.prepare() on every channel change.
+    LaunchedEffect(Unit) {
         playItem(currentItem)
     }
+
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -180,11 +187,18 @@ fun PlayerScreen(
                             }
                         }
                         KeyEvent.KEYCODE_DPAD_UP -> {
-                            if (!showMiniGuide) {
-                                showMiniGuide = true
-                                true
-                            } else {
-                                false
+                            when {
+                                // Fix #6: Only jump straight to mini guide when OSD is already hidden.
+                                // If controls are visible, first close them (next UP press opens guide).
+                                !showMiniGuide && !showControls -> {
+                                    showMiniGuide = true
+                                    true
+                                }
+                                !showMiniGuide && showControls -> {
+                                    // Let focus navigate within OSD; don't intercept
+                                    false
+                                }
+                                else -> false
                             }
                         }
                         KeyEvent.KEYCODE_DPAD_DOWN -> {
@@ -393,7 +407,7 @@ fun PlayerScreen(
                                     .background(CardSurface)
                                     .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
                             ) {
-                                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                             }
 
                             Column {
@@ -438,9 +452,9 @@ fun PlayerScreen(
                                 onClick = { showMiniGuide = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = CardSurface),
                                 shape = RoundedCornerShape(8.dp),
-                                border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle))
+                                border = BorderStroke(1.dp, BorderSubtle)
                             ) {
-                                Icon(Icons.Default.List, contentDescription = "Channel Guide", tint = AccentSky, modifier = Modifier.size(18.dp))
+                                Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Channel Guide", tint = AccentSky, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text("Channel Guide", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
@@ -564,7 +578,7 @@ fun PlayerScreen(
                                     }
                                 },
                                 shape = RoundedCornerShape(8.dp),
-                                border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle)),
+                                border = BorderStroke(1.dp, BorderSubtle),
                                 colors = ButtonDefaults.outlinedButtonColors(containerColor = CardSurface, contentColor = TextPrimary)
                             ) {
                                 Icon(Icons.Default.AspectRatio, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -636,7 +650,11 @@ fun PlayerScreen(
                                 item = item,
                                 channelNumber = 101 + index,
                                 isFavorite = favoritesManager.isFavorite(item.id),
-                                onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
+                                onToggleFavorite = {
+                                    val newState = favoritesManager.toggleFavorite(item.id)
+                                    // Fix #16: sync OSD header star if we toggled the current item
+                                    if (item.id == currentItem.id) isFavorite = newState
+                                },
                                 onFocusChange = {},
                                 onClick = {
                                     playItem(item)

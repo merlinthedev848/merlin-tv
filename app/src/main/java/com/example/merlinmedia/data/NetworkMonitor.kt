@@ -1,4 +1,4 @@
-﻿package com.example.merlinmedia.data
+package com.example.merlinmedia.data
 
 import android.content.Context
 import android.net.ConnectivityManager
@@ -53,6 +53,7 @@ class NetworkMonitor(context: Context) {
         val manager = connectivityManager ?: return true
         val activeNetwork = manager.activeNetwork ?: return false
         val capabilities = manager.getNetworkCapabilities(activeNetwork) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 }

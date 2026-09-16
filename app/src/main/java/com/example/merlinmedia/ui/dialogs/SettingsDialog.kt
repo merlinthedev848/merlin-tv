@@ -1,4 +1,4 @@
-﻿package com.example.merlinmedia.ui.dialogs
+package com.example.merlinmedia.ui.dialogs
 
 import android.content.Intent
 import android.net.Uri
@@ -194,13 +194,20 @@ fun SettingsDialog(
                                     )
                                     Button(
                                         onClick = {
-                                            if (newName.isNotBlank() && newUrl.isNotBlank()) {
-                                                CatalogRepository.addCustomPlaylist(context, newName.trim(), newUrl.trim())
-                                                customPlaylists = CatalogRepository.getCustomPlaylists(context)
-                                                newName = ""
-                                                newUrl = ""
-                                                showAddForm = false
-                                                onPlaylistChanged()
+                                            val trimmedUrl = newUrl.trim()
+                                            val isValidUrl = trimmedUrl.startsWith("http://", ignoreCase = true) ||
+                                                    trimmedUrl.startsWith("https://", ignoreCase = true)
+                                            when {
+                                                newName.isBlank() -> Toast.makeText(context, "Please enter a playlist name", Toast.LENGTH_SHORT).show()
+                                                !isValidUrl -> Toast.makeText(context, "URL must start with http:// or https://", Toast.LENGTH_SHORT).show()
+                                                else -> {
+                                                    CatalogRepository.addCustomPlaylist(context, newName.trim(), trimmedUrl)
+                                                    customPlaylists = CatalogRepository.getCustomPlaylists(context)
+                                                    newName = ""
+                                                    newUrl = ""
+                                                    showAddForm = false
+                                                    onPlaylistChanged()
+                                                }
                                             }
                                         },
                                         modifier = Modifier.align(Alignment.End),

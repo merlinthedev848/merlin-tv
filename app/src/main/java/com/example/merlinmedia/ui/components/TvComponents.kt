@@ -1,4 +1,4 @@
-﻿package com.example.merlinmedia.ui.components
+package com.example.merlinmedia.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -165,14 +165,16 @@ fun HeroPreviewPanel(
                         }
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(Color(0xFF1E2433))
-                            .border(1.dp, BorderSubtle, RoundedCornerShape(4.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text("1080p 60fps", color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    if (item.source.isNotBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFF1E2433))
+                                .border(1.dp, BorderSubtle, RoundedCornerShape(4.dp))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(item.source, color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                        }
                     }
                 }
 

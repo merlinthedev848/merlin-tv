@@ -1,4 +1,4 @@
-﻿package com.example.merlinmedia.data
+package com.example.merlinmedia.data
 
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
@@ -8,13 +8,45 @@ object M3uParser {
     private val GROUP_REGEX = Regex("""group-title="([^"]*)"""", RegexOption.IGNORE_CASE)
     private val TVG_NAME_REGEX = Regex("""tvg-name="([^"]*)"""", RegexOption.IGNORE_CASE)
     private val TVG_ID_REGEX = Regex("""tvg-id="([^"]*)"""", RegexOption.IGNORE_CASE)
+    private val TVG_COUNTRY_REGEX = Regex("""tvg-country="([^"]*)"""", RegexOption.IGNORE_CASE)
 
-    fun parse(m3uContent: String, defaultCountry: String = "", sourceLabel: String = "IPTV Playlist"): List<MediaEntry> {
+    // Markers for streams that are known dead, geo-restricted, or intermittent
+    private val DEAD_OR_BLOCKED_MARKERS = listOf(
+        "[geo-blocked]",
+        "[geoblocked]",
+        "[geo]",
+        "[offline]",
+        "[dead]",
+        "[blocked]",
+        "[not 24/7]",
+        "[offline/dead]",
+        "[no stream]"
+    )
+
+    // Web domains that ExoPlayer cannot stream directly without browser/JS extractors
+    private val NON_DIRECT_STREAM_DOMAINS = listOf(
+        "youtube.com",
+        "youtu.be",
+        "twitch.tv",
+        "dailymotion.com",
+        "facebook.com",
+        "vimeo.com",
+        "ok.ru",
+        "tiktok.com"
+    )
+
+    fun parse(
+        m3uContent: String,
+        defaultCountry: String = "",
+        defaultKind: Kind = Kind.LIVE,
+        sourceLabel: String = "IPTV Playlist"
+    ): List<MediaEntry> {
         val entries = mutableListOf<MediaEntry>()
         var currentTitle = ""
         var currentLogo: String? = null
         var currentGroup = ""
         var currentId = ""
+        var currentCountry = defaultCountry
 
         for (rawLine in m3uContent.lineSequence()) {
             val line = rawLine.trim()
@@ -31,6 +63,14 @@ object M3uParser {
                 // Extract tvg-id
                 currentId = TVG_ID_REGEX.find(line)?.groupValues?.getOrNull(1)?.trim().orEmpty()
 
+                // Extract tvg-country if available
+                val countryMatch = TVG_COUNTRY_REGEX.find(line)?.groupValues?.getOrNull(1)?.trim()
+                if (!countryMatch.isNullOrBlank()) {
+                    currentCountry = countryMatch
+                } else {
+                    currentCountry = defaultCountry
+                }
+
                 // Extract Title (after last comma)
                 val commaIndex = line.lastIndexOf(',')
                 currentTitle = if (commaIndex != -1 && commaIndex + 1 < line.length) {
@@ -38,30 +78,59 @@ object M3uParser {
                 } else {
                     TVG_NAME_REGEX.find(line)?.groupValues?.getOrNull(1)?.trim().orEmpty().ifBlank { "Channel" }
                 }
-            } else if (line.startsWith("http://", ignoreCase = true) || line.startsWith("https://", ignoreCase = true)) {
-                if (currentTitle.isBlank()) {
-                    currentTitle = "Channel ${entries.size + 1}"
+            } else if (
+                line.startsWith("http://", ignoreCase = true) ||
+                line.startsWith("https://", ignoreCase = true) ||
+                line.startsWith("rtsp://", ignoreCase = true) ||
+                line.startsWith("rtmp://", ignoreCase = true) ||
+                line.startsWith("mms://", ignoreCase = true)
+            ) {
+                val lowerTitle = currentTitle.lowercase()
+                val lowerLine = line.lowercase()
+
+                // 1. Filter out known dead or geoblocked streams
+                val isDeadOrBlocked = DEAD_OR_BLOCKED_MARKERS.any { marker ->
+                    lowerTitle.contains(marker) || lowerLine.contains(marker)
                 }
-                val entryId = if (currentId.isNotBlank()) currentId else "$currentTitle-$line".hashCode().toString()
-                
-                entries.add(
-                    MediaEntry(
-                        id = entryId,
-                        title = currentTitle,
-                        url = line,
-                        type = Kind.LIVE,
-                        country = defaultCountry,
-                        group = currentGroup.ifBlank { "General" },
-                        logo = currentLogo,
-                        source = sourceLabel
+
+                // 2. Filter out non-stream web embeds
+                val isNonDirectStream = NON_DIRECT_STREAM_DOMAINS.any { domain ->
+                    lowerLine.contains(domain)
+                }
+
+                // 3. Filter out plain HTML or invalid pages
+                val isHtmlPage = lowerLine.endsWith(".html") || lowerLine.endsWith(".htm")
+
+                if (!isDeadOrBlocked && !isNonDirectStream && !isHtmlPage) {
+                    // Clean title: remove any leftover bracket artifacts
+                    val cleanTitle = currentTitle
+                        .replace(Regex("""\[.*?\]"""), "")
+                        .replace(Regex("""\s+"""), " ")
+                        .trim()
+                        .ifBlank { "Channel ${entries.size + 1}" }
+
+                    val entryId = if (currentId.isNotBlank()) currentId else "$cleanTitle-$line".hashCode().toString()
+
+                    entries.add(
+                        MediaEntry(
+                            id = entryId,
+                            title = cleanTitle,
+                            url = line,
+                            type = defaultKind,
+                            country = currentCountry,
+                            group = currentGroup.ifBlank { "General" },
+                            logo = currentLogo,
+                            source = sourceLabel
+                        )
                     )
-                )
-                
+                }
+
                 // Reset per-entry state
                 currentTitle = ""
                 currentLogo = null
                 currentGroup = ""
                 currentId = ""
+                currentCountry = defaultCountry
             }
         }
         return entries

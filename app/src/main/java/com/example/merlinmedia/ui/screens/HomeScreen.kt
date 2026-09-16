@@ -1,6 +1,7 @@
-﻿package com.example.merlinmedia.ui.screens
+package com.example.merlinmedia.ui.screens
 
 import androidx.compose.animation.*
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +11,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Feed
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,6 +33,8 @@ import com.example.merlinmedia.ui.theme.*
 @Composable
 fun HomeScreen(
     liveChannels: List<MediaEntry>,
+    movieChannels: List<MediaEntry>,
+    seriesChannels: List<MediaEntry>,
     isLoading: Boolean,
     isOnline: Boolean,
     availableUpdate: UpdateInfo?,
@@ -52,23 +56,24 @@ fun HomeScreen(
     }
 
     // Filter items based on active tab, filter, and search query
-    val currentItems = remember(selectedTab, selectedFilter, searchQuery, liveChannels, favoriteIds.value) {
+    val currentItems = remember(selectedTab, selectedFilter, searchQuery, liveChannels, movieChannels, seriesChannels, favoriteIds.value) {
         val baseList = when (selectedTab) {
             Kind.LIVE -> liveChannels
-            Kind.MOVIE -> CatalogRepository.movies
-            Kind.SERIES -> CatalogRepository.series
+            Kind.MOVIE -> movieChannels
+            Kind.SERIES -> seriesChannels
             Kind.FAVORITES -> {
+                // Show only actual favourites from loaded catalogs
                 val favSet = favoriteIds.value
-                val allKnown = liveChannels + CatalogRepository.movies + CatalogRepository.series
-                val directMatches = allKnown.filter { favSet.contains(it.id) }
-                if (directMatches.isNotEmpty()) directMatches else favoritesManager.getRecentHistory()
+                val allKnown = liveChannels + movieChannels + seriesChannels
+                allKnown.filter { favSet.contains(it.id) }
             }
         }
 
         baseList.filter { item ->
-            val matchesFilter = if (selectedTab == Kind.LIVE && selectedFilter != "All") {
+            val matchesFilter = if (selectedFilter != "All") {
                 item.country.equals(selectedFilter, ignoreCase = true) ||
-                        item.group.equals(selectedFilter, ignoreCase = true)
+                        item.group.contains(selectedFilter, ignoreCase = true) ||
+                        item.source.contains(selectedFilter, ignoreCase = true)
             } else {
                 true
             }
@@ -87,13 +92,17 @@ fun HomeScreen(
         }
     }
 
-    // Keep focused item updated with the first available item if null
+    // Keep focusedItem and its channel number in sync with filtered list
     LaunchedEffect(currentItems) {
         if (currentItems.isNotEmpty() && (focusedItem == null || !currentItems.contains(focusedItem))) {
             focusedItem = currentItems.first()
             focusedIndex = 101
+        } else if (focusedItem != null) {
+            val idx = currentItems.indexOf(focusedItem)
+            if (idx >= 0) focusedIndex = 101 + idx
         }
     }
+
 
     Row(
         modifier = Modifier
@@ -155,14 +164,20 @@ fun HomeScreen(
                 icon = Icons.Default.PlayCircle,
                 label = "Movies",
                 isSelected = selectedTab == Kind.MOVIE,
-                onClick = { selectedTab = Kind.MOVIE }
+                onClick = {
+                    selectedTab = Kind.MOVIE
+                    selectedFilter = "All"
+                }
             )
 
             NavRailItem(
                 icon = Icons.Default.Movie,
                 label = "Series",
                 isSelected = selectedTab == Kind.SERIES,
-                onClick = { selectedTab = Kind.SERIES }
+                onClick = {
+                    selectedTab = Kind.SERIES
+                    selectedFilter = "All"
+                }
             )
 
             NavRailItem(
@@ -171,6 +186,7 @@ fun HomeScreen(
                 isSelected = selectedTab == Kind.FAVORITES,
                 onClick = {
                     selectedTab = Kind.FAVORITES
+                    selectedFilter = "All"
                     refreshFavorites()
                 }
             )
@@ -228,7 +244,7 @@ fun HomeScreen(
             )
 
             NavRailItem(
-                icon = Icons.Default.Feed,
+                icon = Icons.AutoMirrored.Filled.Feed,
                 label = "News",
                 isSelected = selectedTab == Kind.LIVE && selectedFilter == "News",
                 onClick = {
@@ -255,6 +271,36 @@ fun HomeScreen(
                 .padding(horizontal = 24.dp, vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            // Fix #14: Offline banner — was previously received but never displayed
+            AnimatedVisibility(
+                visible = !isOnline,
+                enter = androidx.compose.animation.slideInVertically() + androidx.compose.animation.fadeIn(),
+                exit = androidx.compose.animation.slideOutVertically() + androidx.compose.animation.fadeOut()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFB91C1C))
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.WifiOff,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "No internet connection — live channels unavailable",
+                        color = Color.White,
+                        fontWeight = FontWeight.SemiBold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+
             // Top Bar: Check Updates Button + Search Bar + Refresh
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -268,7 +314,7 @@ fun HomeScreen(
                         containerColor = if (availableUpdate != null) LiveBadgeColor else Color(0xFF1E2433)
                     ),
                     shape = RoundedCornerShape(8.dp),
-                    border = ButtonDefaults.outlinedButtonBorder.copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle)),
+                    border = BorderStroke(1.dp, BorderSubtle),
                     contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
                 ) {
                     Icon(
@@ -320,7 +366,7 @@ fun HomeScreen(
             )
 
             // Channels Grid (Shelves)
-            if (isLoading && selectedTab == Kind.LIVE && liveChannels.isEmpty()) {
+            if (isLoading && currentItems.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()

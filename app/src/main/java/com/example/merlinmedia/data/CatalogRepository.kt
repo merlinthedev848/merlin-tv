@@ -1,9 +1,11 @@
-﻿package com.example.merlinmedia.data
+package com.example.merlinmedia.data
 
 import android.content.Context
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -26,7 +28,21 @@ object CatalogRepository {
         "Italy" to "https://iptv-org.github.io/iptv/countries/it.m3u"
     )
 
+    private const val FREE_TV_PLAYLIST = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
+    private const val MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/movies.m3u"
+    private const val CLASSIC_MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/classic.m3u"
+    private const val SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/series.m3u"
+    private const val ANIMATION_SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/animation.m3u"
+    private const val DOCUMENTARY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/documentary.m3u"
+
+    @Volatile
     private var cachedLiveChannels: List<MediaEntry> = emptyList()
+
+    @Volatile
+    private var cachedMovieChannels: List<MediaEntry> = emptyList()
+
+    @Volatile
+    private var cachedSeriesChannels: List<MediaEntry> = emptyList()
 
     fun getSelectedCountryCodes(context: Context): Set<String> {
         val prefs = context.getSharedPreferences("merlin_country_prefs", Context.MODE_PRIVATE)
@@ -35,12 +51,27 @@ object CatalogRepository {
 
     fun setSelectedCountryCodes(context: Context, countries: Set<String>) {
         context.getSharedPreferences("merlin_country_prefs", Context.MODE_PRIVATE)
-            .edit()
-            .putStringSet("selected_countries", countries)
-            .apply()
+        .edit()
+        .putStringSet("selected_countries", countries)
+        .apply()
         cachedLiveChannels = emptyList() // Invalidate cache
     }
 
+    private fun fetchM3uContent(url: String): String {
+        return runCatching {
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "Mozilla/5.0 (Linux; Android TV; MerlinTV)")
+                .build()
+            client.newCall(request).execute().use { response ->
+                if (response.isSuccessful) response.body?.string().orEmpty() else ""
+            }
+        }.getOrDefault("")
+    }
+
+    /**
+     * Load dynamic Live TV channels from selected country feeds, Free-TV curated lists, and custom playlists.
+     */
     suspend fun loadLive(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedLiveChannels.isNotEmpty() && !forceRefresh) {
             return@withContext cachedLiveChannels
@@ -49,46 +80,141 @@ object CatalogRepository {
         val allEntries = mutableListOf<MediaEntry>()
         val activeCountries = context?.let { getSelectedCountryCodes(it) } ?: setOf("UK", "USA")
 
-        // 1. Load active country playlists
-        for ((country, url) in availableCountries) {
-            if (activeCountries.contains(country)) {
-                runCatching {
-                    val request = Request.Builder()
-                        .url(url)
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android TV; MerlinTV)")
-                        .build()
-                    val body = client.newCall(request).execute().use { response ->
-                        if (response.isSuccessful) response.body?.string().orEmpty() else ""
-                    }
-                    if (body.isNotBlank()) {
-                        allEntries.addAll(M3uParser.parse(body, defaultCountry = country, sourceLabel = "iptv-org $country"))
+        // 1. Fetch active country playlists in parallel
+        coroutineScope {
+            val countryTasks = availableCountries
+                .filter { activeCountries.contains(it.first) }
+                .map { (country, url) ->
+                    async(Dispatchers.IO) {
+                        val body = fetchM3uContent(url)
+                        if (body.isNotBlank()) {
+                            M3uParser.parse(body, defaultCountry = country, defaultKind = Kind.LIVE, sourceLabel = "iptv-org $country")
+                        } else {
+                            emptyList()
+                        }
                     }
                 }
-            }
-        }
 
-        // 2. Load custom playlists if configured in SharedPreferences
-        context?.let { ctx ->
-            val customUrls = getCustomPlaylists(ctx)
-            for ((name, url) in customUrls) {
-                runCatching {
-                    val request = Request.Builder()
-                        .url(url)
-                        .header("User-Agent", "Mozilla/5.0 (Linux; Android TV; MerlinTV)")
-                        .build()
-                    val body = client.newCall(request).execute().use { response ->
-                        if (response.isSuccessful) response.body?.string().orEmpty() else ""
-                    }
-                    if (body.isNotBlank()) {
-                        allEntries.addAll(M3uParser.parse(body, defaultCountry = "Custom", sourceLabel = name))
-                    }
+            // 2. Fetch curated Free-TV global playlist
+            val freeTvTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(FREE_TV_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.LIVE, sourceLabel = "Free-TV")
+                } else {
+                    emptyList()
                 }
             }
+
+            // 3. Fetch custom playlists if configured
+            val customTasks = context?.let { ctx ->
+                getCustomPlaylists(ctx).map { (name, url) ->
+                    async(Dispatchers.IO) {
+                        val body = fetchM3uContent(url)
+                        if (body.isNotBlank()) {
+                            M3uParser.parse(body, defaultCountry = "Custom", defaultKind = Kind.LIVE, sourceLabel = name)
+                        } else {
+                            emptyList()
+                        }
+                    }
+                }
+            } ?: emptyList()
+
+            // Collect all results
+            countryTasks.forEach { allEntries.addAll(it.await()) }
+            allEntries.addAll(freeTvTask.await())
+            customTasks.forEach { allEntries.addAll(it.await()) }
         }
 
         val distinctList = allEntries.distinctBy { it.url }
         cachedLiveChannels = distinctList
         distinctList
+    }
+
+    /**
+     * Load dynamic real Movies catalog from public legal M3U movie channels & classic cinema streams.
+     */
+    suspend fun loadMovies(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
+        if (cachedMovieChannels.isNotEmpty() && !forceRefresh) {
+            return@withContext cachedMovieChannels
+        }
+
+        val allEntries = mutableListOf<MediaEntry>()
+
+        coroutineScope {
+            val moviesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(MOVIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Movies", defaultKind = Kind.MOVIE, sourceLabel = "Public Cinema")
+                } else emptyList()
+            }
+
+            val classicTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(CLASSIC_MOVIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Classic", defaultKind = Kind.MOVIE, sourceLabel = "Classic Movies")
+                } else emptyList()
+            }
+
+            allEntries.addAll(moviesTask.await())
+            allEntries.addAll(classicTask.await())
+        }
+
+        val distinctList = allEntries.distinctBy { it.url }
+        cachedMovieChannels = distinctList
+        distinctList
+    }
+
+    /**
+     * Load dynamic real TV Series & Animation catalog from public legal M3U streams.
+     */
+    suspend fun loadSeries(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
+        if (cachedSeriesChannels.isNotEmpty() && !forceRefresh) {
+            return@withContext cachedSeriesChannels
+        }
+
+        val allEntries = mutableListOf<MediaEntry>()
+
+        coroutineScope {
+            val seriesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(SERIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Series", defaultKind = Kind.SERIES, sourceLabel = "Public Series")
+                } else emptyList()
+            }
+
+            val animationTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(ANIMATION_SERIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Animation", defaultKind = Kind.SERIES, sourceLabel = "Animation")
+                } else emptyList()
+            }
+
+            val docTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(DOCUMENTARY_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Documentary", defaultKind = Kind.SERIES, sourceLabel = "Documentaries")
+                } else emptyList()
+            }
+
+            allEntries.addAll(seriesTask.await())
+            allEntries.addAll(animationTask.await())
+            allEntries.addAll(docTask.await())
+        }
+
+        val distinctList = allEntries.distinctBy { it.url }
+        cachedSeriesChannels = distinctList
+        distinctList
+    }
+
+    /**
+     * Parallel loader for all three catalogs simultaneously.
+     */
+    suspend fun loadAllCatalogs(context: Context? = null, forceRefresh: Boolean = false): Triple<List<MediaEntry>, List<MediaEntry>, List<MediaEntry>> = coroutineScope {
+        val liveDeferred = async(Dispatchers.IO) { loadLive(context, forceRefresh) }
+        val moviesDeferred = async(Dispatchers.IO) { loadMovies(context, forceRefresh) }
+        val seriesDeferred = async(Dispatchers.IO) { loadSeries(context, forceRefresh) }
+
+        Triple(liveDeferred.await(), moviesDeferred.await(), seriesDeferred.await())
     }
 
     fun getCategories(entries: List<MediaEntry>): List<String> {
@@ -133,94 +259,4 @@ object CatalogRepository {
             .apply()
         cachedLiveChannels = emptyList() // invalidate cache
     }
-
-    val movies: List<MediaEntry> = listOf(
-        MediaEntry(
-            id = "movie-bbb",
-            title = "Big Buck Bunny",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-            type = Kind.MOVIE,
-            group = "Animation",
-            country = "Open Movie",
-            logo = "https://peach.blender.org/wp-content/uploads/bbb-splash.png",
-            description = "A large and lovable rabbit deals with bullying forest creatures in this classic Blender Foundation open animation.",
-            source = "Blender Open Project"
-        ),
-        MediaEntry(
-            id = "movie-sintel",
-            title = "Sintel",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-            type = Kind.MOVIE,
-            group = "Fantasy",
-            country = "Open Movie",
-            logo = "https://durian.blender.org/wp-content/themes/durian/images/header/header_sintel.jpg",
-            description = "A lonely young woman named Sintel searches for a baby dragon she befriended and named Scales.",
-            source = "Blender Foundation"
-        ),
-        MediaEntry(
-            id = "movie-tears-of-steel",
-            title = "Tears of Steel",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-            type = Kind.MOVIE,
-            group = "Sci-Fi",
-            country = "Open Movie",
-            logo = "https://mango.blender.org/wp-content/uploads/2012/09/poster_tos_large.jpg",
-            description = "Set in a dystopian future in Amsterdam, a group of scientists attempt to stage a critical moment in time.",
-            source = "Blender Foundation"
-        ),
-        MediaEntry(
-            id = "movie-elephants-dream",
-            title = "Elephants Dream",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4",
-            type = Kind.MOVIE,
-            group = "Sci-Fi",
-            country = "Open Movie",
-            logo = "https://orange.blender.org/wp-content/themes/orange/images/header.jpg",
-            description = "The world's first open movie, following Proog and Emo on a journey through the surreal machine.",
-            source = "Blender Foundation"
-        )
-    )
-
-    val series: List<MediaEntry> = listOf(
-        MediaEntry(
-            id = "series-blazes",
-            title = "Open Shorts · Ep. 1 · For Bigger Blazes",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-            type = Kind.SERIES,
-            group = "Demo Shorts",
-            country = "US",
-            description = "High-definition chromecast and streaming demonstration showcase short.",
-            source = "Google Open Media"
-        ),
-        MediaEntry(
-            id = "series-escapes",
-            title = "Open Shorts · Ep. 2 · For Bigger Escapes",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-            type = Kind.SERIES,
-            group = "Demo Shorts",
-            country = "US",
-            description = "Action-packed outdoor showcase clip exploring dynamic frame rates and HDR color grading.",
-            source = "Google Open Media"
-        ),
-        MediaEntry(
-            id = "series-fun",
-            title = "Open Shorts · Ep. 3 · For Bigger Fun",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-            type = Kind.SERIES,
-            group = "Demo Shorts",
-            country = "US",
-            description = "Vibrant demo short highlighting high-resolution cinematic pacing and surround sound fidelity.",
-            source = "Google Open Media"
-        ),
-        MediaEntry(
-            id = "series-joyrides",
-            title = "Open Shorts · Ep. 4 · For Bigger Joyrides",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-            type = Kind.SERIES,
-            group = "Demo Shorts",
-            country = "US",
-            description = "Scenic landscape and aerial motion sequence testing bitrate adaptability.",
-            source = "Google Open Media"
-        )
-    )
 }
