@@ -1,4 +1,4 @@
-﻿name: Merlin TV CI & Release
+name: Merlin TV CI & Release
 
 on:
   push:
@@ -56,26 +56,8 @@ jobs:
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Decode Keystore (if configured)
-        if: env.MERLIN_KEYSTORE_BASE64 != ''
-        env:
-          MERLIN_KEYSTORE_BASE64: ${{ secrets.MERLIN_KEYSTORE_BASE64 }}
-        run: |
-          echo "$MERLIN_KEYSTORE_BASE64" | base64 --decode > release.keystore
-          echo "MERLIN_KEYSTORE_PATH=$(pwd)/release.keystore" >> $GITHUB_ENV
-
-      - name: Build Release APK
-        env:
-          MERLIN_KEYSTORE_PASSWORD: ${{ secrets.MERLIN_KEYSTORE_PASSWORD }}
-          MERLIN_KEY_ALIAS: ${{ secrets.MERLIN_KEY_ALIAS }}
-          MERLIN_KEY_PASSWORD: ${{ secrets.MERLIN_KEY_PASSWORD }}
-        run: |
-          if [ -f "release.keystore" ]; then
-            ./gradlew assembleRelease --stacktrace
-          else
-            ./gradlew assembleDebug --stacktrace
-            cp app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/debug/merlin-tv-${{ github.ref_name }}.apk
-          fi
+      - name: Build Signed APKs
+        run: ./gradlew assembleRelease assembleDebug --stacktrace
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2

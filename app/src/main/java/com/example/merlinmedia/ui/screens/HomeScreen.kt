@@ -9,7 +9,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Feed
 import androidx.compose.material.icons.filled.*
@@ -51,6 +53,16 @@ fun HomeScreen(
     var focusedItem by remember { mutableStateOf<MediaEntry?>(null) }
     var focusedIndex by remember { mutableIntStateOf(101) }
 
+    // Live Clock State
+    var currentTime by remember { mutableStateOf("") }
+    LaunchedEffect(Unit) {
+        val formatter = java.text.SimpleDateFormat("hh:mm:ss a • EEE, dd MMM", java.util.Locale.getDefault())
+        while (true) {
+            currentTime = formatter.format(java.util.Date())
+            kotlinx.coroutines.delay(1000)
+        }
+    }
+
     fun refreshFavorites() {
         favoriteIds.value = favoritesManager.getFavoriteIds()
     }
@@ -62,7 +74,6 @@ fun HomeScreen(
             Kind.MOVIE -> movieChannels
             Kind.SERIES -> seriesChannels
             Kind.FAVORITES -> {
-                // Show only actual favourites from loaded catalogs
                 val favSet = favoriteIds.value
                 val allKnown = liveChannels + movieChannels + seriesChannels
                 allKnown.filter { favSet.contains(it.id) }
@@ -92,6 +103,11 @@ fun HomeScreen(
         }
     }
 
+    // Dynamic country counts
+    val countryCounts = remember(liveChannels) {
+        liveChannels.groupingBy { it.country.ifBlank { "Global" } }.eachCount()
+    }
+
     // Keep focusedItem and its channel number in sync with filtered list
     LaunchedEffect(currentItems) {
         if (currentItems.isNotEmpty() && (focusedItem == null || !currentItems.contains(focusedItem))) {
@@ -103,31 +119,31 @@ fun HomeScreen(
         }
     }
 
-
     Row(
         modifier = Modifier
             .fillMaxSize()
             .background(BgDark)
     ) {
-        // Left Navigation Rail (Solid, Clean Sidebar)
+        // Left Navigation Rail (Solid, Clean Sidebar with dynamic country & category list)
         Column(
             modifier = Modifier
-                .width(220.dp)
+                .width(230.dp)
                 .fillMaxHeight()
                 .background(NavRailBg)
                 .border(1.dp, BorderSubtle)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
+                .padding(12.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // App Branding
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp)
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(34.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(PrimaryBlue),
                     contentAlignment = Alignment.Center
@@ -139,20 +155,27 @@ fun HomeScreen(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-                Text(
-                    text = "Merlin TV",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
+                Column {
+                    Text(
+                        text = "Merlin TV",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "v1.2.4 Premium",
+                        fontSize = 10.sp,
+                        color = PrimaryCyan
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // Main Tabs
             NavRailItem(
                 icon = Icons.Default.LiveTv,
-                label = "Live TV",
+                label = "Live TV (${liveChannels.size})",
                 isSelected = selectedTab == Kind.LIVE && selectedFilter == "All",
                 onClick = {
                     selectedTab = Kind.LIVE
@@ -162,7 +185,7 @@ fun HomeScreen(
 
             NavRailItem(
                 icon = Icons.Default.PlayCircle,
-                label = "Movies",
+                label = "Movies (${movieChannels.size})",
                 isSelected = selectedTab == Kind.MOVIE,
                 onClick = {
                     selectedTab = Kind.MOVIE
@@ -172,7 +195,7 @@ fun HomeScreen(
 
             NavRailItem(
                 icon = Icons.Default.Movie,
-                label = "Series",
+                label = "Series (${seriesChannels.size})",
                 isSelected = selectedTab == Kind.SERIES,
                 onClick = {
                     selectedTab = Kind.SERIES
@@ -182,7 +205,7 @@ fun HomeScreen(
 
             NavRailItem(
                 icon = Icons.Default.Favorite,
-                label = "Favorites",
+                label = "Favorites (${favoriteIds.value.size})",
                 isSelected = selectedTab == Kind.FAVORITES,
                 onClick = {
                     selectedTab = Kind.FAVORITES
@@ -198,80 +221,92 @@ fun HomeScreen(
                 onClick = onOpenSettingsDialog
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             HorizontalDivider(color = BorderSubtle)
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = "CHANNELS & REGIONS",
+                text = "REGIONS & COUNTRIES",
                 color = TextMuted,
                 fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.padding(horizontal = 8.dp)
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
-            // Category & Region Filters
-            NavRailItem(
-                icon = Icons.Default.Flag,
-                label = "UK Channels",
-                isSelected = selectedTab == Kind.LIVE && selectedFilter == "UK",
-                onClick = {
-                    selectedTab = Kind.LIVE
-                    selectedFilter = "UK"
-                }
+            // Dynamic country list
+            val countries = listOf(
+                "UK" to "🇬🇧 UK Channels",
+                "USA" to "🇺🇸 USA Channels",
+                "Canada" to "🇨🇦 Canada",
+                "Australia" to "🇦🇺 Australia",
+                "France" to "🇫🇷 France",
+                "Germany" to "🇩🇪 Germany",
+                "Spain" to "🇪🇸 Spain",
+                "Italy" to "🇮🇹 Italy"
             )
 
-            NavRailItem(
-                icon = Icons.Default.Flag,
-                label = "USA Channels",
-                isSelected = selectedTab == Kind.LIVE && selectedFilter == "USA",
-                onClick = {
-                    selectedTab = Kind.LIVE
-                    selectedFilter = "USA"
-                }
+            countries.forEach { (code, name) ->
+                val count = countryCounts[code] ?: 0
+                NavRailItem(
+                    icon = Icons.Default.Flag,
+                    label = if (count > 0) "$name ($count)" else name,
+                    isSelected = selectedTab == Kind.LIVE && selectedFilter == code,
+                    onClick = {
+                        selectedTab = Kind.LIVE
+                        selectedFilter = code
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(6.dp))
+            HorizontalDivider(color = BorderSubtle)
+            Spacer(modifier = Modifier.height(6.dp))
+
+            Text(
+                text = "GENRES & CATEGORIES",
+                color = TextMuted,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(horizontal = 8.dp)
             )
 
-            NavRailItem(
-                icon = Icons.Default.SportsSoccer,
-                label = "Sports",
-                isSelected = selectedTab == Kind.LIVE && selectedFilter == "Sports",
-                onClick = {
-                    selectedTab = Kind.LIVE
-                    selectedFilter = "Sports"
-                }
+            Spacer(modifier = Modifier.height(2.dp))
+
+            // Category filters
+            val categories = listOf(
+                "Entertainment" to Icons.Default.TheaterComedy,
+                "News" to Icons.AutoMirrored.Filled.Feed,
+                "Sports" to Icons.Default.SportsSoccer,
+                "Movies" to Icons.Default.MovieCreation,
+                "Kids" to Icons.Default.ChildCare,
+                "Music" to Icons.Default.MusicNote,
+                "Science" to Icons.Default.Science,
+                "Documentary" to Icons.Default.MenuBook
             )
 
-            NavRailItem(
-                icon = Icons.AutoMirrored.Filled.Feed,
-                label = "News",
-                isSelected = selectedTab == Kind.LIVE && selectedFilter == "News",
-                onClick = {
-                    selectedTab = Kind.LIVE
-                    selectedFilter = "News"
-                }
-            )
-
-            NavRailItem(
-                icon = Icons.Default.TheaterComedy,
-                label = "Entertainment",
-                isSelected = selectedTab == Kind.LIVE && selectedFilter == "Entertainment",
-                onClick = {
-                    selectedTab = Kind.LIVE
-                    selectedFilter = "Entertainment"
-                }
-            )
+            categories.forEach { (cat, icon) ->
+                NavRailItem(
+                    icon = icon,
+                    label = cat,
+                    isSelected = selectedTab == Kind.LIVE && selectedFilter.equals(cat, ignoreCase = true),
+                    onClick = {
+                        selectedTab = Kind.LIVE
+                        selectedFilter = cat
+                    }
+                )
+            }
         }
 
         // Right Main Content Area
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 20.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            // Fix #14: Offline banner — was previously received but never displayed
+            // Offline banner
             AnimatedVisibility(
                 visible = !isOnline,
                 enter = androidx.compose.animation.slideInVertically() + androidx.compose.animation.fadeIn(),
@@ -301,52 +336,89 @@ fun HomeScreen(
                 }
             }
 
-            // Top Bar: Check Updates Button + Search Bar + Refresh
+            // Top Bar: Live Clock + Check Updates Button + Search Bar + Refresh
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Software Update Button
-                Button(
-                    onClick = onOpenUpdateDialog,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (availableUpdate != null) LiveBadgeColor else Color(0xFF1E2433)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(1.dp, BorderSubtle),
-                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                // Live Clock & Active Category
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Icon(
-                        imageVector = if (availableUpdate != null) Icons.Default.SystemUpdate else Icons.Default.Sync,
-                        contentDescription = null,
-                        tint = if (availableUpdate != null) Color.White else AccentSky,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        text = if (availableUpdate != null) "Update v${availableUpdate.version}" else "Check Updates",
-                        color = TextPrimary,
-                        fontWeight = FontWeight.SemiBold,
-                        fontSize = 13.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFF1E2433))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
+                            color = AccentSky,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+
+                    if (selectedFilter != "All") {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(PrimaryBlue.copy(alpha = 0.2f))
+                                .border(1.dp, PrimaryBlue, RoundedCornerShape(6.dp))
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = "Filtered: $selectedFilter (${currentItems.size})",
+                                color = TextPrimary,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
+                    // Software Update Button
+                    Button(
+                        onClick = onOpenUpdateDialog,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = if (availableUpdate != null) LiveBadgeColor else Color(0xFF1E2433)
+                        ),
+                        shape = RoundedCornerShape(8.dp),
+                        border = BorderStroke(1.dp, BorderSubtle),
+                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (availableUpdate != null) Icons.Default.SystemUpdate else Icons.Default.Sync,
+                            contentDescription = null,
+                            tint = if (availableUpdate != null) Color.White else AccentSky,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = if (availableUpdate != null) "Update v${availableUpdate.version}" else "v1.2.4 Updates",
+                            color = TextPrimary,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 12.sp
+                        )
+                    }
+
                     TvSearchBar(
                         query = searchQuery,
                         onQueryChange = { searchQuery = it },
-                        placeholderText = "Search channels...",
-                        modifier = Modifier.width(280.dp)
+                        placeholderText = "Search ${currentItems.size} items...",
+                        modifier = Modifier.width(260.dp)
                     )
 
                     IconButton(
                         onClick = onRefreshChannels,
                         modifier = Modifier
-                            .size(38.dp)
+                            .size(36.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(SurfaceDark)
                             .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
@@ -365,7 +437,7 @@ fun HomeScreen(
                 }
             )
 
-            // Channels Grid (Shelves)
+            // Channels Grid
             if (isLoading && currentItems.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -394,6 +466,7 @@ fun HomeScreen(
                     ) {
                         Icon(Icons.Default.TvOff, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
                         Text("No channels found in this section", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Try selecting 'All' or adjusting your search.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     }
                 }
             } else {

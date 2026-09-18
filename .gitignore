@@ -5,4 +5,12 @@ build/
 app/build/
 *.iml
 *.jks
+!keystore/merlin.jks
 *.keystore
+*.apk
+*.jar
+*.zip
+*.msg
+jdk/
+decoded_apk/
+decoded_apk_full/

@@ -12,26 +12,35 @@ android {
         applicationId = "com.example.merlinmedia"
         minSdk = 23
         targetSdk = 35
-        versionCode = 123
-        versionName = "1.2.3"
+        versionCode = 124
+        versionName = "1.2.4"
     }
 
     signingConfigs {
-        create("release") {
-            val ks = System.getenv("MERLIN_KEYSTORE_PATH")
-            if (!ks.isNullOrBlank()) storeFile = file(ks)
-            storePassword = System.getenv("MERLIN_KEYSTORE_PASSWORD")
-            keyAlias = System.getenv("MERLIN_KEY_ALIAS")
-            keyPassword = System.getenv("MERLIN_KEY_PASSWORD")
+        create("merlinSigning") {
+            val ksFile = rootProject.file("keystore/merlin.jks")
+            if (ksFile.exists()) {
+                storeFile = ksFile
+                storePassword = "merlinpassword123"
+                keyAlias = "merlin"
+                keyPassword = "merlinpassword123"
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+                enableV4Signing = true
+            }
         }
     }
 
     buildFeatures { compose = true; buildConfig = true }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("merlinSigning")
+        }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.getByName("merlinSigning")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -46,6 +55,16 @@ android {
     }
 
     packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+
+    applicationVariants.all {
+        val variant = this
+        variant.outputs.all {
+            val outputImpl = this as? com.android.build.gradle.internal.api.BaseVariantOutputImpl
+            if (outputImpl != null) {
+                outputImpl.outputFileName = "merlin-tv-${variant.versionName}.apk"
+            }
+        }
+    }
 }
 
 dependencies {

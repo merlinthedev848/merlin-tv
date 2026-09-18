@@ -138,12 +138,22 @@ object UpdateManager {
     fun installApk(context: Context, apkFile: File) {
         if (!apkFile.exists()) return
 
+        // Ensure file is world-readable
+        apkFile.setReadable(true, false)
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && !context.packageManager.canRequestPackageInstalls()) {
-            val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                data = Uri.parse("package:${context.packageName}")
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            runCatching {
+                val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                    data = Uri.parse("package:${context.packageName}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(settingsIntent)
+            }.onFailure {
+                val fallbackIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(fallbackIntent)
             }
-            context.startActivity(settingsIntent)
             return
         }
 
@@ -155,9 +165,24 @@ object UpdateManager {
 
         val installIntent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(apkUri, "application/vnd.android.package-archive")
+            clipData = android.content.ClipData.newRawUri("package", apkUri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
         }
+
+        // Grant URI read permission to resolving package installer handlers
+        val resolveList = context.packageManager.queryIntentActivities(installIntent, 0)
+        for (resolveInfo in resolveList) {
+            val packageName = resolveInfo.activityInfo.packageName
+            context.grantUriPermission(
+                packageName,
+                apkUri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION
+            )
+        }
+
         context.startActivity(installIntent)
     }
 
