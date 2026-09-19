@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.merlinmedia.BuildConfig
 import com.example.merlinmedia.data.CatalogRepository
 import com.example.merlinmedia.data.FavoritesManager
 import com.example.merlinmedia.model.Kind
@@ -163,7 +164,7 @@ fun HomeScreen(
                         color = TextPrimary
                     )
                     Text(
-                        text = "v1.2.4 Premium",
+                        text = "v${BuildConfig.VERSION_NAME} Premium",
                         fontSize = 10.sp,
                         color = PrimaryCyan
                     )
@@ -401,7 +402,7 @@ fun HomeScreen(
                         )
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = if (availableUpdate != null) "Update v${availableUpdate.version}" else "v1.2.4 Updates",
+                            text = if (availableUpdate != null) "Update v${availableUpdate.version}" else "v${BuildConfig.VERSION_NAME} Updates",
                             color = TextPrimary,
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 12.sp
