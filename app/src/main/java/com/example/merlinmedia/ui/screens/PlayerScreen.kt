@@ -49,6 +49,7 @@ import com.example.merlinmedia.ui.components.ChannelGridCard
 import com.example.merlinmedia.ui.components.TvSearchBar
 import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun PlayerScreen(
@@ -68,6 +69,9 @@ fun PlayerScreen(
     var aspectMode by remember { mutableStateOf(AspectRatioMode.FIT) }
     // Fix #2: don't initialise once from initialItem — derive from currentItem on every change
     var isFavorite by remember { mutableStateOf(false) }
+    var reconnectAttempt by remember { mutableIntStateOf(0) }
+    var isAutoReconnecting by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
 
     val currentIndex = remember(currentItem, playlist) {
         val idx = playlist.indexOfFirst { it.url == currentItem.url }
@@ -85,7 +89,7 @@ fun PlayerScreen(
 
     // Auto-hide controls after 5 seconds if mini guide is not open
     LaunchedEffect(showControls, isPlaying, showMiniGuide) {
-        if (showControls && isPlaying && errorMessage == null && !showMiniGuide) {
+        if (showControls && isPlaying && errorMessage == null && !showMiniGuide && !isAutoReconnecting) {
             delay(5000)
             showControls = false
         }
@@ -102,10 +106,14 @@ fun PlayerScreen(
         ExoPlayerHelper.createPlayer(context, lowLatencyMode = true)
     }
 
-    fun playItem(item: MediaEntry) {
+    fun playItem(item: MediaEntry, resetRetry: Boolean = true) {
         currentItem = item
         errorMessage = null
         isBuffering = true
+        if (resetRetry) {
+            reconnectAttempt = 0
+            isAutoReconnecting = false
+        }
         player.stop()
         player.clearMediaItems()
         player.setMediaItem(ExoPlayerHelper.buildMediaItem(item.url, item.title))
@@ -113,13 +121,9 @@ fun PlayerScreen(
         player.playWhenReady = true
     }
 
-    // Fix #1: Only trigger initial playback once — subsequent channel changes call playItem() directly.
-    // Previously LaunchedEffect(currentItem.url) re-fired every time playItem() set currentItem,
-    // causing a double player.prepare() on every channel change.
     LaunchedEffect(Unit) {
         playItem(currentItem)
     }
-
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -132,6 +136,8 @@ fun PlayerScreen(
                     Player.STATE_READY -> {
                         isBuffering = false
                         errorMessage = null
+                        reconnectAttempt = 0
+                        isAutoReconnecting = false
                     }
                     Player.STATE_ENDED -> {
                         isBuffering = false
@@ -148,8 +154,22 @@ fun PlayerScreen(
 
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = false
-                errorMessage = "Playback Error: ${error.message ?: "Stream offline or geo-restricted"}"
-                showControls = true
+                if (reconnectAttempt < 3) {
+                    val nextAttempt = reconnectAttempt + 1
+                    reconnectAttempt = nextAttempt
+                    isAutoReconnecting = true
+                    errorMessage = null
+                    coroutineScope.launch {
+                        delay(2000)
+                        if (isAutoReconnecting) {
+                            playItem(currentItem, resetRetry = false)
+                        }
+                    }
+                } else {
+                    isAutoReconnecting = false
+                    errorMessage = "Stream disconnected: ${error.message ?: "Broadcast offline or geo-restricted"}"
+                    showControls = true
+                }
             }
         }
         player.addListener(listener)
@@ -280,8 +300,8 @@ fun PlayerScreen(
             modifier = Modifier.fillMaxSize()
         )
 
-        // Buffering Indicator
-        if (isBuffering && errorMessage == null) {
+        // Buffering / Reconnecting Indicator
+        if ((isBuffering || isAutoReconnecting) && errorMessage == null) {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
@@ -297,9 +317,13 @@ fun PlayerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(14.dp)
                     ) {
-                        CircularProgressIndicator(color = AccentSky, strokeWidth = 3.dp, modifier = Modifier.size(24.dp))
+                        CircularProgressIndicator(
+                            color = if (isAutoReconnecting) AccentGold else AccentSky,
+                            strokeWidth = 3.dp,
+                            modifier = Modifier.size(24.dp)
+                        )
                         Text(
-                            text = "Loading Stream...",
+                            text = if (isAutoReconnecting) "Reconnecting stream (Attempt $reconnectAttempt of 3)..." else "Loading Stream...",
                             color = TextPrimary,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium

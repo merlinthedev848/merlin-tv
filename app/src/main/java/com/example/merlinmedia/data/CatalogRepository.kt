@@ -7,15 +7,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
-import java.util.concurrent.TimeUnit
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
 
 object CatalogRepository {
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(20, TimeUnit.SECONDS)
-        .build()
 
     val availableCountries = listOf(
         "UK" to "https://iptv-org.github.io/iptv/countries/uk.m3u",
@@ -58,8 +55,9 @@ object CatalogRepository {
         cachedLiveChannels = emptyList() // Invalidate cache
     }
 
-    private fun fetchM3uContent(url: String): String {
+    private fun fetchM3uContent(context: Context?, url: String): String {
         return runCatching {
+            val client = HttpClientProvider.getClient(context)
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", "Mozilla/5.0 (Linux; Android TV; MerlinTV)")
@@ -70,12 +68,80 @@ object CatalogRepository {
         }.getOrDefault("")
     }
 
+    // ==========================================
+    // DISK CACHING MECHANISM FOR INSTANT OFFLINE
+    // ==========================================
+    private fun getCacheFile(context: Context, categoryName: String): File {
+        val cacheDir = File(context.cacheDir, "catalogs")
+        if (!cacheDir.exists()) cacheDir.mkdirs()
+        return File(cacheDir, "$categoryName.json")
+    }
+
+    private fun saveToDiskCache(context: Context, categoryName: String, items: List<MediaEntry>) {
+        runCatching {
+            val file = getCacheFile(context, categoryName)
+            val jsonArray = JSONArray()
+            items.forEach { entry ->
+                val obj = JSONObject().apply {
+                    put("id", entry.id)
+                    put("title", entry.title)
+                    put("url", entry.url)
+                    put("type", entry.type.name)
+                    put("country", entry.country)
+                    put("group", entry.group)
+                    put("logo", entry.logo ?: "")
+                    put("description", entry.description)
+                    put("source", entry.source)
+                }
+                jsonArray.put(obj)
+            }
+            file.writeText(jsonArray.toString())
+        }
+    }
+
+    private fun loadFromDiskCache(context: Context, categoryName: String): List<MediaEntry> {
+        return runCatching {
+            val file = getCacheFile(context, categoryName)
+            if (!file.exists()) return emptyList()
+            val content = file.readText()
+            if (content.isBlank()) return emptyList()
+            val jsonArray = JSONArray(content)
+            val list = mutableListOf<MediaEntry>()
+            for (i in 0 until jsonArray.length()) {
+                val obj = jsonArray.getJSONObject(i)
+                list.add(
+                    MediaEntry(
+                        id = obj.optString("id"),
+                        title = obj.optString("title"),
+                        url = obj.optString("url"),
+                        type = runCatching { Kind.valueOf(obj.optString("type")) }.getOrDefault(Kind.LIVE),
+                        country = obj.optString("country"),
+                        group = obj.optString("group"),
+                        logo = obj.optString("logo").ifBlank { null },
+                        description = obj.optString("description"),
+                        source = obj.optString("source")
+                    )
+                )
+            }
+            list
+        }.getOrDefault(emptyList())
+    }
+
     /**
      * Load dynamic Live TV channels from selected country feeds, Free-TV curated lists, and custom playlists.
      */
     suspend fun loadLive(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedLiveChannels.isNotEmpty() && !forceRefresh) {
             return@withContext cachedLiveChannels
+        }
+
+        // Fast disk cache fallback on initial start
+        if (!forceRefresh && context != null) {
+            val diskItems = loadFromDiskCache(context, "live")
+            if (diskItems.isNotEmpty()) {
+                cachedLiveChannels = diskItems
+                return@withContext diskItems
+            }
         }
 
         val allEntries = mutableListOf<MediaEntry>()
@@ -90,7 +156,7 @@ object CatalogRepository {
                 .filter { activeCountries.contains(it.first) }
                 .map { (country, url) ->
                     async(Dispatchers.IO) {
-                        val body = fetchM3uContent(url)
+                        val body = fetchM3uContent(context, url)
                         if (body.isNotBlank()) {
                             val parsed = M3uParser.parse(body, defaultCountry = country, defaultKind = Kind.LIVE, sourceLabel = "iptv-org $country")
                             parsed.map { entry ->
@@ -110,7 +176,7 @@ object CatalogRepository {
 
             // 2. Fetch curated Free-TV global playlist
             val freeTvTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(FREE_TV_PLAYLIST)
+                val body = fetchM3uContent(context, FREE_TV_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.LIVE, sourceLabel = "Free-TV")
                 } else {
@@ -122,7 +188,7 @@ object CatalogRepository {
             val customTasks = context?.let { ctx ->
                 getCustomPlaylists(ctx).map { (name, url) ->
                     async(Dispatchers.IO) {
-                        val body = fetchM3uContent(url)
+                        val body = fetchM3uContent(ctx, url)
                         if (body.isNotBlank()) {
                             M3uParser.parse(body, defaultCountry = "Custom", defaultKind = Kind.LIVE, sourceLabel = name)
                         } else {
@@ -140,6 +206,9 @@ object CatalogRepository {
 
         val distinctList = allEntries.distinctBy { it.url }
         cachedLiveChannels = distinctList
+        if (context != null) {
+            saveToDiskCache(context, "live", distinctList)
+        }
         distinctList
     }
 
@@ -151,18 +220,26 @@ object CatalogRepository {
             return@withContext cachedMovieChannels
         }
 
+        if (!forceRefresh && context != null) {
+            val diskItems = loadFromDiskCache(context, "movies")
+            if (diskItems.isNotEmpty()) {
+                cachedMovieChannels = diskItems
+                return@withContext diskItems
+            }
+        }
+
         val allEntries = mutableListOf<MediaEntry>()
 
         coroutineScope {
             val moviesTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(MOVIES_PLAYLIST)
+                val body = fetchM3uContent(context, MOVIES_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Movies", defaultKind = Kind.MOVIE, sourceLabel = "Public Cinema")
                 } else emptyList()
             }
 
             val classicTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(CLASSIC_MOVIES_PLAYLIST)
+                val body = fetchM3uContent(context, CLASSIC_MOVIES_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Classic", defaultKind = Kind.MOVIE, sourceLabel = "Classic Movies")
                 } else emptyList()
@@ -174,6 +251,9 @@ object CatalogRepository {
 
         val distinctList = allEntries.distinctBy { it.url }
         cachedMovieChannels = distinctList
+        if (context != null) {
+            saveToDiskCache(context, "movies", distinctList)
+        }
         distinctList
     }
 
@@ -185,25 +265,33 @@ object CatalogRepository {
             return@withContext cachedSeriesChannels
         }
 
+        if (!forceRefresh && context != null) {
+            val diskItems = loadFromDiskCache(context, "series")
+            if (diskItems.isNotEmpty()) {
+                cachedSeriesChannels = diskItems
+                return@withContext diskItems
+            }
+        }
+
         val allEntries = mutableListOf<MediaEntry>()
 
         coroutineScope {
             val seriesTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(SERIES_PLAYLIST)
+                val body = fetchM3uContent(context, SERIES_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Series", defaultKind = Kind.SERIES, sourceLabel = "Public Series")
                 } else emptyList()
             }
 
             val animationTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(ANIMATION_SERIES_PLAYLIST)
+                val body = fetchM3uContent(context, ANIMATION_SERIES_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Animation", defaultKind = Kind.SERIES, sourceLabel = "Animation")
                 } else emptyList()
             }
 
             val docTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(DOCUMENTARY_PLAYLIST)
+                val body = fetchM3uContent(context, DOCUMENTARY_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Documentary", defaultKind = Kind.SERIES, sourceLabel = "Documentaries")
                 } else emptyList()
@@ -216,6 +304,9 @@ object CatalogRepository {
 
         val distinctList = allEntries.distinctBy { it.url }
         cachedSeriesChannels = distinctList
+        if (context != null) {
+            saveToDiskCache(context, "series", distinctList)
+        }
         distinctList
     }
 

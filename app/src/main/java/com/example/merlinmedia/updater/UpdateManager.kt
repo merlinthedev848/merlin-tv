@@ -7,27 +7,22 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import com.example.merlinmedia.BuildConfig
+import com.example.merlinmedia.data.HttpClientProvider
 import com.example.merlinmedia.model.UpdateInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
-import java.util.concurrent.TimeUnit
 
 object UpdateManager {
     const val GITHUB_REPO = "merlinthedev848/merlin-tv"
     private const val API_URL = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
-    
-    private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .build()
 
-    suspend fun checkForUpdates(): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
+    suspend fun checkForUpdates(context: Context? = null): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
         runCatching {
+            val client = HttpClientProvider.getClient(context)
             val request = Request.Builder()
                 .url(API_URL)
                 .header("Accept", "application/vnd.github+json")
@@ -98,6 +93,7 @@ object UpdateManager {
                 .header("User-Agent", "MerlinTV/${BuildConfig.VERSION_NAME} (Android)")
                 .build()
 
+            val client = HttpClientProvider.getClient(context)
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
                 response.close()
