@@ -54,7 +54,16 @@ android {
         jvmTarget = "17"
     }
 
-    packaging { resources.excludes += "/META-INF/{AL2.0,LGPL2.1}" }
+    packaging {
+        resources {
+            excludes += setOf(
+                "/META-INF/{AL2.0,LGPL2.1}",
+                "/META-INF/*.version",
+                "/META-INF/DEPENDENCIES",
+                "/META-INF/INDEX.LIST"
+            )
+        }
+    }
 
     applicationVariants.all {
         val variant = this
