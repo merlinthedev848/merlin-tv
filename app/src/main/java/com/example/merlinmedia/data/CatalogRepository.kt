@@ -36,6 +36,10 @@ object CatalogRepository {
     private const val FREE_TV_PLAYLIST = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
     private const val PLUTO_GB_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_gb.m3u"
     private const val PLUTO_US_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_us.m3u"
+    private const val SAMSUNG_GB_PLAYLIST = "https://i.mjh.nz/SamsungTVPlus/gb.m3u8"
+    private const val SAMSUNG_US_PLAYLIST = "https://i.mjh.nz/SamsungTVPlus/us.m3u8"
+    private const val PLEX_GB_PLAYLIST = "https://i.mjh.nz/Plex/gb.m3u8"
+    private const val PLEX_US_PLAYLIST = "https://i.mjh.nz/Plex/us.m3u8"
     private const val MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/movies.m3u"
     private const val CLASSIC_MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/classic.m3u"
     private const val SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/series.m3u"
@@ -300,7 +304,7 @@ object CatalogRepository {
     }
 
     /**
-     * Load dynamic real Movies catalog from public legal M3U movie channels & classic cinema streams.
+     * Load dynamic real Movies catalog from public legal M3U movie channels, Samsung TV Plus, Plex & classic cinema streams.
      */
     suspend fun loadMovies(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedMovieChannels.isNotEmpty() && !forceRefresh) {
@@ -332,8 +336,34 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val samsungMoviesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, SAMSUNG_GB_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "UK", defaultKind = Kind.MOVIE, sourceLabel = "Samsung TV Plus")
+                    parsed.filter { 
+                        val text = "${it.title} ${it.group}".lowercase()
+                        text.contains("movie") || text.contains("cinema") || text.contains("film") || 
+                        text.contains("action") || text.contains("thriller") || text.contains("comedy") ||
+                        text.contains("horror") || text.contains("drama") || text.contains("sci-fi")
+                    }.map { it.copy(type = Kind.MOVIE, group = "Cinema | ${it.group.ifBlank { "MOVIES" }.uppercase()}") }
+                } else emptyList()
+            }
+
+            val plexMoviesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, PLEX_GB_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.MOVIE, sourceLabel = "Plex Cinema")
+                    parsed.filter {
+                        val text = "${it.title} ${it.group}".lowercase()
+                        text.contains("movie") || text.contains("cinema") || text.contains("film") || text.contains("action")
+                    }.map { it.copy(type = Kind.MOVIE, group = "Movies | ${it.group.ifBlank { "FEATURE FILMS" }.uppercase()}") }
+                } else emptyList()
+            }
+
             allEntries.addAll(moviesTask.await())
             allEntries.addAll(classicTask.await())
+            allEntries.addAll(samsungMoviesTask.await())
+            allEntries.addAll(plexMoviesTask.await())
         }
 
         val distinctList = allEntries.distinctBy { it.url }
@@ -345,7 +375,7 @@ object CatalogRepository {
     }
 
     /**
-     * Load dynamic real TV Series & Animation catalog from public legal M3U streams.
+     * Load dynamic real TV Series & Animation catalog from public legal M3U streams & FAST binge networks.
      */
     suspend fun loadSeries(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedSeriesChannels.isNotEmpty() && !forceRefresh) {
@@ -384,9 +414,36 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val samsungSeriesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, SAMSUNG_GB_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "UK", defaultKind = Kind.SERIES, sourceLabel = "Samsung TV Plus")
+                    parsed.filter {
+                        val text = "${it.title} ${it.group}".lowercase()
+                        text.contains("series") || text.contains("binge") || text.contains("drama") ||
+                        text.contains("crime") || text.contains("doc") || text.contains("kids") ||
+                        text.contains("top gear") || text.contains("doctor who") || text.contains("csi") ||
+                        text.contains("baywatch") || text.contains("star trek")
+                    }.map { it.copy(type = Kind.SERIES, group = "Series | ${it.group.ifBlank { "BINGE TV" }.uppercase()}") }
+                } else emptyList()
+            }
+
+            val plexSeriesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, PLEX_GB_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.SERIES, sourceLabel = "Plex Series")
+                    parsed.filter {
+                        val text = "${it.title} ${it.group}".lowercase()
+                        text.contains("series") || text.contains("tv") || text.contains("binge") || text.contains("show")
+                    }.map { it.copy(type = Kind.SERIES, group = "Series | ${it.group.ifBlank { "STREAMING SERIES" }.uppercase()}") }
+                } else emptyList()
+            }
+
             allEntries.addAll(seriesTask.await())
             allEntries.addAll(animationTask.await())
             allEntries.addAll(docTask.await())
+            allEntries.addAll(samsungSeriesTask.await())
+            allEntries.addAll(plexSeriesTask.await())
         }
 
         val distinctList = allEntries.distinctBy { it.url }
