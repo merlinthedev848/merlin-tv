@@ -19,63 +19,89 @@ import java.io.FileOutputStream
 object UpdateManager {
     const val GITHUB_REPO = "merlinthedev848/merlin-tv"
     private const val API_URL = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
+    private const val RAW_VERSION_URL = "https://raw.githubusercontent.com/$GITHUB_REPO/main/version.json"
 
     suspend fun checkForUpdates(context: Context? = null): Result<UpdateInfo?> = withContext(Dispatchers.IO) {
         runCatching {
             val client = HttpClientProvider.getClient(context)
-            val request = Request.Builder()
-                .url(API_URL)
-                .header("Accept", "application/vnd.github+json")
-                .header("User-Agent", "MerlinTV/${BuildConfig.VERSION_NAME} (Android)")
-                .build()
 
-            val response = client.newCall(request).execute()
-            if (response.code == 404) {
-                // No releases yet in repository
-                return@runCatching null
-            }
-            if (!response.isSuccessful) {
-                throw IllegalStateException("GitHub API error: HTTP ${response.code} ${response.message}")
-            }
+            // 1. Try GitHub Releases API first
+            val apiUpdate = runCatching {
+                val request = Request.Builder()
+                    .url(API_URL)
+                    .header("Accept", "application/vnd.github+json")
+                    .header("User-Agent", "MerlinTV/${BuildConfig.VERSION_NAME} (Android)")
+                    .build()
 
-            val bodyString = response.body?.string().orEmpty()
-            if (bodyString.isBlank()) return@runCatching null
+                client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) return@use null
+                    val bodyString = response.body?.string().orEmpty()
+                    if (bodyString.isBlank()) return@use null
 
-            val json = JSONObject(bodyString)
-            val rawTag = json.optString("tag_name", "").trim()
-            val cleanVersion = rawTag.removePrefix("v").removePrefix("V")
-            val releaseNotes = json.optString("body", "No release notes provided.")
-            val releaseDate = json.optString("published_at", "")
-            val releaseHtmlUrl = json.optString("html_url", "https://github.com/$GITHUB_REPO/releases")
+                    val json = JSONObject(bodyString)
+                    val rawTag = json.optString("tag_name", "").trim()
+                    val cleanVersion = rawTag.removePrefix("v").removePrefix("V")
+                    val releaseNotes = json.optString("body", "No release notes provided.")
+                    val releaseDate = json.optString("published_at", "")
+                    val releaseHtmlUrl = json.optString("html_url", "https://github.com/$GITHUB_REPO/releases")
 
-            val assets = json.optJSONArray("assets") ?: return@runCatching null
-            var apkDownloadUrl = ""
+                    val assets = json.optJSONArray("assets") ?: return@use null
+                    var apkDownloadUrl = ""
 
-            for (i in 0 until assets.length()) {
-                val asset = assets.getJSONObject(i)
-                val name = asset.optString("name", "")
-                if (name.endsWith(".apk", ignoreCase = true)) {
-                    apkDownloadUrl = asset.optString("browser_download_url", "")
-                    break
+                    for (i in 0 until assets.length()) {
+                        val asset = assets.getJSONObject(i)
+                        val name = asset.optString("name", "")
+                        if (name.endsWith(".apk", ignoreCase = true)) {
+                            apkDownloadUrl = asset.optString("browser_download_url", "")
+                            break
+                        }
+                    }
+
+                    if (apkDownloadUrl.isNotBlank() && isNewerVersion(cleanVersion, BuildConfig.VERSION_NAME)) {
+                        UpdateInfo(
+                            version = cleanVersion,
+                            apkUrl = apkDownloadUrl,
+                            notes = releaseNotes,
+                            releaseDate = releaseDate,
+                            releaseUrl = releaseHtmlUrl
+                        )
+                    } else null
                 }
+            }.getOrNull()
+
+            if (apiUpdate != null) {
+                return@runCatching apiUpdate
             }
 
-            if (apkDownloadUrl.isBlank()) {
-                return@runCatching null
-            }
+            // 2. Fallback to raw version.json on main branch (immune to API rate-limiting)
+            runCatching {
+                val req = Request.Builder()
+                    .url(RAW_VERSION_URL)
+                    .header("User-Agent", "MerlinTV/${BuildConfig.VERSION_NAME} (Android)")
+                    .build()
 
-            val isNew = isNewerVersion(cleanVersion, BuildConfig.VERSION_NAME)
-            if (isNew) {
-                UpdateInfo(
-                    version = cleanVersion,
-                    apkUrl = apkDownloadUrl,
-                    notes = releaseNotes,
-                    releaseDate = releaseDate,
-                    releaseUrl = releaseHtmlUrl
-                )
-            } else {
-                null
-            }
+                client.newCall(req).execute().use { resp ->
+                    if (!resp.isSuccessful) return@use null
+                    val body = resp.body?.string().orEmpty()
+                    if (body.isBlank()) return@use null
+                    val json = JSONObject(body)
+                    val ver = json.optString("version", "").trim()
+                    val downloadUrl = json.optString("downloadUrl", "")
+                    val relUrl = json.optString("releaseUrl", "https://github.com/$GITHUB_REPO/releases")
+                    val notes = json.optString("releaseNotes", "Bug fixes and performance improvements.")
+                    val date = json.optString("publishedAt", "")
+
+                    if (ver.isNotBlank() && downloadUrl.isNotBlank() && isNewerVersion(ver, BuildConfig.VERSION_NAME)) {
+                        UpdateInfo(
+                            version = ver,
+                            apkUrl = downloadUrl,
+                            notes = notes,
+                            releaseDate = date,
+                            releaseUrl = relUrl
+                        )
+                    } else null
+                }
+            }.getOrNull()
         }
     }
 
