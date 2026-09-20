@@ -19,10 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,28 +69,33 @@ fun NavRailItem(
             )
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .padding(horizontal = 14.dp, vertical = 10.dp)
+            .padding(horizontal = 12.dp, vertical = 9.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = contentColor,
-            modifier = Modifier.size(20.dp)
+            modifier = Modifier.size(18.dp)
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = label,
             color = contentColor,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
+            fontSize = 13.sp
         )
     }
 }
 
+/**
+ * Sleek, compact Header Details Bar (replaces the giant overpowering hero card).
+ * Takes up minimal vertical space (~54dp) leaving maximum room for channel browsing.
+ */
 @Composable
-fun HeroPreviewPanel(
+fun FocusedChannelHeaderBar(
     item: MediaEntry?,
     channelNumber: Int,
     onWatchClick: () -> Unit,
@@ -97,131 +104,157 @@ fun HeroPreviewPanel(
     if (item == null) return
 
     Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+            .fillMaxWidth()
+            .height(58.dp),
+        shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle)),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(20.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Channel Logo / Badge
-            Box(
-                modifier = Modifier
-                    .size(90.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(Color(0xFF0F1218))
-                    .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp)),
-                contentAlignment = Alignment.Center
+            // Left: Channel Logo or Initial Badge + Info Details
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.weight(1f)
             ) {
-                if (!item.logo.isNullOrBlank()) {
-                    AsyncImage(
-                        model = item.logo,
-                        contentDescription = item.title,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(8.dp),
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Text(
-                        text = item.title.take(3).uppercase(),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = AccentSky
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.width(20.dp))
-
-            // Details
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Compact Logo / Badge
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(
+                            Brush.linearGradient(
+                                listOf(Color(0xFF1E293B), Color(0xFF0F172A))
+                            )
+                        )
+                        .border(1.dp, BorderSubtle, RoundedCornerShape(6.dp)),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Text(
-                        text = item.title,
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-
-                    if (item.type == Kind.LIVE) {
-                        Box(
+                    if (!item.logo.isNullOrBlank()) {
+                        AsyncImage(
+                            model = item.logo,
+                            contentDescription = item.title,
                             modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(LiveBadgeColor)
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text("LIVE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-
-                    if (item.source.isNotBlank()) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(Color(0xFF1E2433))
-                                .border(1.dp, BorderSubtle, RoundedCornerShape(4.dp))
-                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                        ) {
-                            Text(item.source, color = TextSecondary, fontSize = 11.sp, fontWeight = FontWeight.Medium)
-                        }
+                                .fillMaxSize()
+                                .padding(4.dp),
+                            contentScale = ContentScale.Fit
+                        )
+                    } else {
+                        Text(
+                            text = item.title.take(3).uppercase(),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = AccentSky,
+                            fontSize = 12.sp
+                        )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                // Channel Info Title & Tags
+                Column(
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Ch. $channelNumber",
+                            color = AccentSky,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp
+                        )
 
-                val subtitle = listOf(
-                    if (channelNumber > 0) "Ch. $channelNumber" else null,
-                    item.country.ifBlank { null },
-                    item.group.ifBlank { null },
-                    item.source.ifBlank { null }
-                ).filterNotNull().joinToString("  ·  ")
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
 
-                Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = AccentSky,
-                    fontWeight = FontWeight.Medium
-                )
+                        if (item.type == Kind.LIVE) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(LiveBadgeColor)
+                                    .padding(horizontal = 6.dp, vertical = 1.dp)
+                            ) {
+                                Text("LIVE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
 
-                if (item.description.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = item.description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = TextSecondary,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 2.dp)
+                    ) {
+                        if (item.country.isNotBlank()) {
+                            Text(
+                                text = item.country,
+                                color = TextSecondary,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        if (item.group.isNotBlank()) {
+                            Text(
+                                text = "·  ${item.group}",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        if (item.description.isNotBlank()) {
+                            Text(
+                                text = "·  ${item.description}",
+                                color = TextMuted,
+                                fontSize = 11.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(12.dp))
 
+            // Right: Watch Button
             Button(
                 onClick = onWatchClick,
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp)
+                shape = RoundedCornerShape(6.dp),
+                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
+                modifier = Modifier.height(34.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(20.dp))
-                Spacer(modifier = Modifier.width(6.dp))
-                Text("Watch", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Spacer(modifier = Modifier.width(4.dp))
+                Text("Watch", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
     }
 }
 
+/**
+ * Modern Wide 16:9 Channel Tile.
+ * Optimized for Android TV D-Pad navigation:
+ * - Shows clear channel number + favorite star
+ * - Center channel brand logo (with sleek fallback badge, never an empty void)
+ * - Channel title and non-wrapping LIVE badge
+ */
 @Composable
 fun ChannelGridCard(
     item: MediaEntry,
@@ -243,12 +276,12 @@ fun ChannelGridCard(
 
     val scale by animateFloatAsState(
         targetValue = if (isFocused) 1.04f else 1.0f,
-        animationSpec = tween(durationMillis = 150),
+        animationSpec = tween(durationMillis = 120),
         label = "cardScale"
     )
     val borderColor by animateColorAsState(
         targetValue = if (isFocused) FocusRingColor else BorderSubtle,
-        animationSpec = tween(durationMillis = 150),
+        animationSpec = tween(durationMillis = 120),
         label = "cardBorder"
     )
     val backgroundColor = if (isFocused) CardSurfaceFocused else CardSurface
@@ -256,7 +289,8 @@ fun ChannelGridCard(
     Card(
         modifier = modifier
             .scale(scale)
-            .border(if (isFocused) 2.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
+            .height(108.dp)
+            .border(if (isFocused) 2.5.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
@@ -266,45 +300,56 @@ fun ChannelGridCard(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
+                .fillMaxSize()
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header Row: Channel Number & Favorite Icon
+            // Top Header: Channel Number & Favorite Toggle
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = if (channelNumber > 0) "$channelNumber" else "",
-                    color = if (isFocused) AccentSky else TextMuted,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(if (isFocused) PrimaryBlue else Color(0xFF0F141E))
+                        .padding(horizontal = 5.dp, vertical = 1.dp)
+                ) {
+                    Text(
+                        text = "$channelNumber",
+                        color = if (isFocused) Color.White else AccentSky,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
 
                 IconButton(
                     onClick = { onToggleFavorite(item) },
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(20.dp)
                 ) {
                     Icon(
                         imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
                         contentDescription = "Favorite",
                         tint = if (isFavorite) AccentGold else TextMuted,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            // Center: Channel Branding / Logo
+            val logoBgModifier = if (!item.logo.isNullOrBlank()) {
+                Modifier.background(Color(0xFF0C0F17))
+            } else {
+                Modifier.background(Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))))
+            }
 
-            // Logo Box
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(64.dp)
+                    .height(44.dp)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color(0xFF0F1218))
-                    .border(1.dp, BorderSubtle, RoundedCornerShape(6.dp)),
+                    .then(logoBgModifier),
                 contentAlignment = Alignment.Center
             ) {
                 if (!item.logo.isNullOrBlank()) {
@@ -313,53 +358,64 @@ fun ChannelGridCard(
                         contentDescription = item.title,
                         modifier = Modifier
                             .fillMaxSize()
-                            .padding(6.dp),
+                            .padding(4.dp),
                         contentScale = ContentScale.Fit
                     )
                 } else {
-                    Text(
-                        text = item.title.take(3).uppercase(),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = AccentSky
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tv,
+                            contentDescription = null,
+                            tint = AccentSky.copy(alpha = 0.7f),
+                            modifier = Modifier.size(14.dp)
+                        )
+                        Text(
+                            text = item.title.take(8).uppercase(),
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 11.sp
+                        )
+                    }
                 }
             }
 
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Channel Title
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (isFocused) FontWeight.Bold else FontWeight.SemiBold,
-                color = if (isFocused) AccentSky else TextPrimary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-
-            // Tags row
+            // Bottom: Title & Live Badge
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = item.group.ifBlank { item.country },
-                    style = MaterialTheme.typography.labelSmall,
-                    color = TextSecondary,
+                    text = item.title,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = if (isFocused) FontWeight.Bold else FontWeight.SemiBold,
+                    color = if (isFocused) AccentSky else TextPrimary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f)
                 )
 
                 if (item.type == Kind.LIVE) {
+                    Spacer(modifier = Modifier.width(4.dp))
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(3.dp))
                             .background(LiveBadgeColor)
                             .padding(horizontal = 4.dp, vertical = 1.dp)
                     ) {
-                        Text("LIVE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = "LIVE",
+                            color = Color.White,
+                            fontSize = 8.sp,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
                     }
                 }
             }
@@ -377,15 +433,22 @@ fun TvSearchBar(
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = modifier,
-        placeholder = { Text(placeholderText, color = TextMuted, fontSize = 13.sp) },
+        modifier = modifier.height(40.dp),
+        placeholder = { Text(placeholderText, color = TextMuted, fontSize = 12.sp) },
         leadingIcon = {
             Icon(
                 imageVector = Icons.Default.Search,
                 contentDescription = "Search Icon",
                 tint = TextSecondary,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(16.dp)
             )
+        },
+        trailingIcon = {
+            if (query.isNotBlank()) {
+                IconButton(onClick = { onQueryChange("") }, modifier = Modifier.size(20.dp)) {
+                    Icon(Icons.Default.Close, contentDescription = "Clear", tint = TextSecondary, modifier = Modifier.size(14.dp))
+                }
+            }
         },
         singleLine = true,
         shape = RoundedCornerShape(8.dp),

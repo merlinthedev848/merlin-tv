@@ -166,7 +166,7 @@ object CatalogRepository {
                                         "$country | ${entry.group.trim().uppercase()}"
                                     else -> "$country | GENERAL"
                                 }
-                                entry.copy(group = formattedGroup)
+                                entry.copy(country = country, group = formattedGroup)
                             }
                         } else {
                             emptyList()

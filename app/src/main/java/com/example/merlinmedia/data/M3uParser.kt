@@ -35,6 +35,21 @@ object M3uParser {
         "tiktok.com"
     )
 
+    fun normalizeCountry(raw: String): String {
+        val trimmed = raw.trim().uppercase()
+        return when (trimmed) {
+            "UK", "GB", "GBR", "UNITED KINGDOM", "GREAT BRITAIN", "ENGLAND" -> "UK"
+            "US", "USA", "UNITED STATES", "UNITED STATES OF AMERICA" -> "USA"
+            "CA", "CAN", "CANADA" -> "Canada"
+            "AU", "AUS", "AUSTRALIA" -> "Australia"
+            "FR", "FRA", "FRANCE" -> "France"
+            "DE", "DEU", "GER", "GERMANY" -> "Germany"
+            "ES", "ESP", "SPAIN" -> "Spain"
+            "IT", "ITA", "ITALY" -> "Italy"
+            else -> raw.trim()
+        }
+    }
+
     fun parse(
         m3uContent: String,
         defaultCountry: String = "",
@@ -63,12 +78,12 @@ object M3uParser {
                 // Extract tvg-id
                 currentId = TVG_ID_REGEX.find(line)?.groupValues?.getOrNull(1)?.trim().orEmpty()
 
-                // Extract tvg-country if available
+                // Extract tvg-country if available and normalize
                 val countryMatch = TVG_COUNTRY_REGEX.find(line)?.groupValues?.getOrNull(1)?.trim()
-                if (!countryMatch.isNullOrBlank()) {
-                    currentCountry = countryMatch
-                } else {
-                    currentCountry = defaultCountry
+                currentCountry = when {
+                    defaultCountry.isNotBlank() -> defaultCountry
+                    !countryMatch.isNullOrBlank() -> normalizeCountry(countryMatch)
+                    else -> "Global"
                 }
 
                 // Extract Title (after last comma)

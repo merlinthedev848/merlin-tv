@@ -4,7 +4,6 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -58,7 +57,7 @@ fun HomeScreen(
     // Live Clock State
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
-        val formatter = java.text.SimpleDateFormat("hh:mm:ss a • EEE, dd MMM", java.util.Locale.getDefault())
+        val formatter = java.text.SimpleDateFormat("hh:mm a • EEE, dd MMM", java.util.Locale.getDefault())
         while (true) {
             currentTime = formatter.format(java.util.Date())
             kotlinx.coroutines.delay(1000)
@@ -69,7 +68,29 @@ fun HomeScreen(
         favoriteIds.value = favoritesManager.getFavoriteIds()
     }
 
-    // Filter items based on active tab, filter, and search query
+    val countriesList = listOf(
+        "UK" to "🇬🇧 UK Channels",
+        "USA" to "🇺🇸 USA Channels",
+        "Canada" to "🇨🇦 Canada",
+        "Australia" to "🇦🇺 Australia",
+        "France" to "🇫🇷 France",
+        "Germany" to "🇩🇪 Germany",
+        "Spain" to "🇪🇸 Spain",
+        "Italy" to "🇮🇹 Italy"
+    )
+
+    // Accurate Country Counts (Exact match to prevent count drift)
+    val countryCounts = remember(liveChannels) {
+        countriesList.associate { (code, _) ->
+            val count = liveChannels.count { item ->
+                item.country.equals(code, ignoreCase = true) ||
+                item.group.startsWith("$code |", ignoreCase = true)
+            }
+            code to count
+        }
+    }
+
+    // Precise Filter Logic (Matches Sidebar numbers 100% identically)
     val currentItems = remember(selectedTab, selectedFilter, searchQuery, liveChannels, movieChannels, seriesChannels, favoriteIds.value) {
         val baseList = when (selectedTab) {
             Kind.LIVE -> liveChannels
@@ -82,32 +103,34 @@ fun HomeScreen(
             }
         }
 
-        baseList.filter { item ->
-            val matchesFilter = if (selectedFilter != "All") {
-                item.country.equals(selectedFilter, ignoreCase = true) ||
-                        item.group.contains(selectedFilter, ignoreCase = true) ||
-                        item.source.contains(selectedFilter, ignoreCase = true)
+        val filteredByFilter = if (selectedFilter == "All") {
+            baseList
+        } else {
+            val isCountry = countriesList.any { it.first.equals(selectedFilter, ignoreCase = true) }
+            if (isCountry) {
+                baseList.filter { item ->
+                    item.country.equals(selectedFilter, ignoreCase = true) ||
+                    item.group.startsWith("$selectedFilter |", ignoreCase = true)
+                }
             } else {
-                true
+                baseList.filter { item ->
+                    item.group.contains(selectedFilter, ignoreCase = true) ||
+                    item.group.equals(selectedFilter, ignoreCase = true)
+                }
             }
-
-            val matchesSearch = if (searchQuery.isNotBlank()) {
-                val q = searchQuery.trim().lowercase()
-                item.title.lowercase().contains(q) ||
-                        item.group.lowercase().contains(q) ||
-                        item.country.lowercase().contains(q) ||
-                        item.description.lowercase().contains(q)
-            } else {
-                true
-            }
-
-            matchesFilter && matchesSearch
         }
-    }
 
-    // Dynamic country counts
-    val countryCounts = remember(liveChannels) {
-        liveChannels.groupingBy { it.country.ifBlank { "Global" } }.eachCount()
+        if (searchQuery.isBlank()) {
+            filteredByFilter
+        } else {
+            val q = searchQuery.trim().lowercase()
+            filteredByFilter.filter { item ->
+                item.title.lowercase().contains(q) ||
+                item.group.lowercase().contains(q) ||
+                item.country.lowercase().contains(q) ||
+                item.description.lowercase().contains(q)
+            }
+        }
     }
 
     // Keep focusedItem and its channel number in sync with filtered list
@@ -129,23 +152,23 @@ fun HomeScreen(
         // Left Navigation Rail (Solid, Clean Sidebar with dynamic country & category list)
         Column(
             modifier = Modifier
-                .width(230.dp)
+                .width(220.dp)
                 .fillMaxHeight()
                 .background(NavRailBg)
                 .border(1.dp, BorderSubtle)
-                .padding(12.dp)
+                .padding(10.dp)
                 .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(3.dp)
         ) {
             // App Branding
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp)
+                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(34.dp)
+                        .size(32.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(PrimaryBlue),
                     contentAlignment = Alignment.Center
@@ -154,7 +177,7 @@ fun HomeScreen(
                         imageVector = Icons.Default.Tv,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                 }
                 Column {
@@ -172,7 +195,7 @@ fun HomeScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(2.dp))
 
             // Main Tabs
             NavRailItem(
@@ -188,7 +211,7 @@ fun HomeScreen(
             NavRailItem(
                 icon = Icons.Default.PlayCircle,
                 label = "Movies (${movieChannels.size})",
-                isSelected = selectedTab == Kind.MOVIE,
+                isSelected = selectedTab == Kind.MOVIE && selectedFilter == "All",
                 onClick = {
                     selectedTab = Kind.MOVIE
                     selectedFilter = "All"
@@ -198,7 +221,7 @@ fun HomeScreen(
             NavRailItem(
                 icon = Icons.Default.Movie,
                 label = "Series (${seriesChannels.size})",
-                isSelected = selectedTab == Kind.SERIES,
+                isSelected = selectedTab == Kind.SERIES && selectedFilter == "All",
                 onClick = {
                     selectedTab = Kind.SERIES
                     selectedFilter = "All"
@@ -223,33 +246,22 @@ fun HomeScreen(
                 onClick = onOpenSettingsDialog
             )
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             HorizontalDivider(color = BorderSubtle)
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = "REGIONS & COUNTRIES",
                 color = TextMuted,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier.padding(horizontal = 6.dp)
             )
 
             Spacer(modifier = Modifier.height(2.dp))
 
-            // Dynamic country list
-            val countries = listOf(
-                "UK" to "🇬🇧 UK Channels",
-                "USA" to "🇺🇸 USA Channels",
-                "Canada" to "🇨🇦 Canada",
-                "Australia" to "🇦🇺 Australia",
-                "France" to "🇫🇷 France",
-                "Germany" to "🇩🇪 Germany",
-                "Spain" to "🇪🇸 Spain",
-                "Italy" to "🇮🇹 Italy"
-            )
-
-            countries.forEach { (code, name) ->
+            // Country list
+            countriesList.forEach { (code, name) ->
                 val count = countryCounts[code] ?: 0
                 NavRailItem(
                     icon = Icons.Default.Flag,
@@ -262,16 +274,16 @@ fun HomeScreen(
                 )
             }
 
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
             HorizontalDivider(color = BorderSubtle)
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             Text(
                 text = "GENRES & CATEGORIES",
                 color = TextMuted,
-                fontSize = 11.sp,
+                fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 8.dp)
+                modifier = Modifier.padding(horizontal = 6.dp)
             )
 
             Spacer(modifier = Modifier.height(2.dp))
@@ -305,8 +317,8 @@ fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
+                .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Offline banner
             AnimatedVisibility(
@@ -319,41 +331,41 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFFB91C1C))
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.WifiOff,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = "No internet connection — live channels unavailable",
+                        text = "No internet connection — cached channels available",
                         color = Color.White,
                         fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = MaterialTheme.typography.bodySmall
                     )
                 }
             }
 
-            // Top Bar: Live Clock + Check Updates Button + Search Bar + Refresh
+            // Top Bar: Live Clock + Active Filter Badge + Check Updates Button + Search Bar + Refresh
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Live Clock & Active Category
+                // Live Clock & Active Category Pill
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
                             .background(Color(0xFF1E2433))
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
                         Text(
                             text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
@@ -363,27 +375,37 @@ fun HomeScreen(
                         )
                     }
 
-                    if (selectedFilter != "All") {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(PrimaryBlue.copy(alpha = 0.2f))
-                                .border(1.dp, PrimaryBlue, RoundedCornerShape(6.dp))
-                                .padding(horizontal = 10.dp, vertical = 6.dp)
-                        ) {
-                            Text(
-                                text = "Filtered: $selectedFilter (${currentItems.size})",
-                                color = TextPrimary,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                    val filterLabel = if (selectedFilter != "All") {
+                        val cName = countriesList.find { it.first == selectedFilter }?.second ?: selectedFilter
+                        "$cName · ${currentItems.size} items"
+                    } else {
+                        when (selectedTab) {
+                            Kind.LIVE -> "All Live TV · ${currentItems.size}"
+                            Kind.MOVIE -> "All Movies · ${currentItems.size}"
+                            Kind.SERIES -> "All Series · ${currentItems.size}"
+                            Kind.FAVORITES -> "Favorites · ${currentItems.size}"
                         }
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(PrimaryBlue.copy(alpha = 0.15f))
+                            .border(1.dp, PrimaryBlue.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = filterLabel,
+                            color = TextPrimary,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                 }
 
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Software Update Button
                     Button(
@@ -393,20 +415,21 @@ fun HomeScreen(
                         ),
                         shape = RoundedCornerShape(8.dp),
                         border = BorderStroke(1.dp, BorderSubtle),
-                        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(36.dp)
                     ) {
                         Icon(
                             imageVector = if (availableUpdate != null) Icons.Default.SystemUpdate else Icons.Default.Sync,
                             contentDescription = null,
                             tint = if (availableUpdate != null) Color.White else AccentSky,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(5.dp))
                         Text(
-                            text = if (availableUpdate != null) "Update v${availableUpdate.version}" else "v${BuildConfig.VERSION_NAME} Updates",
+                            text = if (availableUpdate != null) "Update v${availableUpdate.version}" else "v${BuildConfig.VERSION_NAME}",
                             color = TextPrimary,
                             fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp
+                            fontSize = 11.sp
                         )
                     }
 
@@ -414,7 +437,7 @@ fun HomeScreen(
                         query = searchQuery,
                         onQueryChange = { searchQuery = it },
                         placeholderText = "Search ${currentItems.size} items...",
-                        modifier = Modifier.width(260.dp)
+                        modifier = Modifier.width(220.dp)
                     )
 
                     IconButton(
@@ -425,13 +448,13 @@ fun HomeScreen(
                             .background(SurfaceDark)
                             .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
                     ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary, modifier = Modifier.size(18.dp))
+                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary, modifier = Modifier.size(16.dp))
                     }
                 }
             }
 
-            // Hero Live Preview Panel
-            HeroPreviewPanel(
+            // Compact Focused Channel Header Bar (Sleek & Space-Efficient)
+            FocusedChannelHeaderBar(
                 item = focusedItem,
                 channelNumber = focusedIndex,
                 onWatchClick = {
@@ -439,7 +462,7 @@ fun HomeScreen(
                 }
             )
 
-            // Channels Grid
+            // Channels Grid (5 Columns, Clean Wide 16:9 Tiles)
             if (isLoading && currentItems.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -449,10 +472,10 @@ fun HomeScreen(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        CircularProgressIndicator(color = AccentSky)
-                        Text("Loading channel catalogs...", color = TextSecondary)
+                        CircularProgressIndicator(color = AccentSky, modifier = Modifier.size(36.dp))
+                        Text("Loading channel catalogs...", color = TextSecondary, fontSize = 13.sp)
                     }
                 }
             } else if (currentItems.isEmpty()) {
@@ -464,18 +487,18 @@ fun HomeScreen(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(Icons.Default.TvOff, contentDescription = null, tint = TextMuted, modifier = Modifier.size(48.dp))
+                        Icon(Icons.Default.TvOff, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
                         Text("No channels found in this section", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                        Text("Try selecting 'All' or adjusting your search.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Text("Try selecting 'All' or adjusting your search query.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
                     }
                 }
             } else {
                 LazyVerticalGrid(
-                    columns = GridCells.Fixed(4),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    columns = GridCells.Fixed(5),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
