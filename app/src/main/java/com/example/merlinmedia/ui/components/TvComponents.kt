@@ -34,7 +34,7 @@ import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.ui.theme.*
 
 @Composable
-fun NavRailItem(
+fun TopNavBarItem(
     icon: ImageVector,
     label: String,
     isSelected: Boolean,
@@ -45,48 +45,260 @@ fun NavRailItem(
     val isFocused by interactionSource.collectIsFocusedAsState()
 
     val bgColor = when {
-        isFocused -> CardSurfaceFocused
-        isSelected -> Color(0xFF1E2433)
+        isFocused -> PrimaryBlue
+        isSelected -> Color(0xFF1E293B)
         else -> Color.Transparent
     }
 
     val contentColor = when {
-        isFocused -> AccentSky
-        isSelected -> TextPrimary
+        isFocused -> Color.White
+        isSelected -> AccentSky
         else -> TextSecondary
     }
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center,
         modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(8.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(bgColor)
             .border(
-                width = if (isFocused) 2.dp else 0.dp,
-                color = if (isFocused) FocusRingColor else Color.Transparent,
-                shape = RoundedCornerShape(8.dp)
+                width = if (isFocused) 2.dp else if (isSelected) 1.dp else 0.dp,
+                color = if (isFocused) Color.White else if (isSelected) PrimaryBlue.copy(alpha = 0.6f) else Color.Transparent,
+                shape = RoundedCornerShape(20.dp)
             )
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 9.dp)
+            .padding(horizontal = 14.dp, vertical = 7.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = label,
             tint = contentColor,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(16.dp)
         )
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(6.dp))
         Text(
             text = label,
             color = contentColor,
             style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.SemiBold,
             fontSize = 13.sp
         )
+    }
+}
+
+/**
+ * CobraTV Pro Style Hero Feature Showcase Banner with Gradient Backdrop & CTA Button.
+ */
+@Composable
+fun HeroFeatureBanner(
+    tag: String,
+    title: String,
+    subtitle: String,
+    actionLabel: String,
+    actionIcon: ImageVector = Icons.Default.PlayArrow,
+    activeDotIndex: Int = 0,
+    totalDots: Int = 4,
+    onActionClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isActionFocused by interactionSource.collectIsFocusedAsState()
+
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(180.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(
+                Brush.horizontalGradient(
+                    listOf(
+                        Color(0xFF0F172A),
+                        Color(0xFF0C1A30),
+                        Color(0xFF03254C)
+                    )
+                )
+            )
+            .border(1.dp, BorderSubtle, RoundedCornerShape(16.dp))
+            .padding(horizontal = 24.dp, vertical = 18.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(0.65f),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                // Category Pill Badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(PrimaryBlue.copy(alpha = 0.35f))
+                        .border(1.dp, PrimaryBlue, RoundedCornerShape(4.dp))
+                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = tag.uppercase(),
+                        color = AccentSky,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                // Bold Title
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Subtitle
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = TextSecondary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Bottom CTA Button & Carousel Dots
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // CTA Action Pill Button
+                Button(
+                    onClick = onActionClick,
+                    interactionSource = interactionSource,
+                    shape = RoundedCornerShape(20.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isActionFocused) Color.White else PrimaryBlue
+                    ),
+                    border = if (isActionFocused) null else androidx.compose.foundation.BorderStroke(1.dp, AccentSky),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                    modifier = Modifier.height(38.dp)
+                ) {
+                    Icon(
+                        imageVector = actionIcon,
+                        contentDescription = null,
+                        tint = if (isActionFocused) Color.Black else Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = actionLabel,
+                        color = if (isActionFocused) Color.Black else Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+
+                // Carousel Dots
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    for (i in 0 until totalDots) {
+                        Box(
+                            modifier = Modifier
+                                .size(if (i == activeDotIndex) 8.dp else 6.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (i == activeDotIndex) AccentSky else Color(0xFF334155))
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * CobraTV Pro Style Featured Hub Shortcut Card (News Hub, Sports Hub, Cinema Hub, etc.)
+ */
+@Composable
+fun HubShortcutCard(
+    title: String,
+    subtitle: String,
+    icon: ImageVector,
+    gradientColors: List<Color>,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.05f else 1.0f,
+        animationSpec = tween(120),
+        label = "hubScale"
+    )
+
+    Card(
+        modifier = modifier
+            .scale(scale)
+            .height(76.dp)
+            .clip(RoundedCornerShape(12.dp))
+            .background(Brush.horizontalGradient(gradientColors))
+            .border(
+                width = if (isFocused) 2.5.dp else 1.dp,
+                color = if (isFocused) Color.White else BorderSubtle,
+                shape = RoundedCornerShape(12.dp)
+            )
+            .focusable(interactionSource = interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = if (isFocused) AccentSky else Color.White,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            Column(
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.weight(1f)
+            ) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White,
+                    fontSize = 13.sp,
+                    maxLines = 1
+                )
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color.White.copy(alpha = 0.7f),
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 

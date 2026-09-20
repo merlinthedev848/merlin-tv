@@ -4,11 +4,14 @@ import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -33,6 +36,18 @@ import com.example.merlinmedia.model.UpdateInfo
 import com.example.merlinmedia.ui.components.*
 import com.example.merlinmedia.ui.theme.*
 
+enum class NavSection {
+    HOME,
+    LIVE,
+    PLUTO,
+    SKY,
+    MOVIES,
+    SERIES,
+    RADIO,
+    HUB,
+    FAVORITES
+}
+
 @Composable
 fun HomeScreen(
     liveChannels: List<MediaEntry>,
@@ -49,20 +64,32 @@ fun HomeScreen(
     onOpenSettingsDialog: () -> Unit,
     onRefreshChannels: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf(Kind.LIVE) }
+    var activeSection by remember { mutableStateOf(NavSection.HOME) }
     var selectedFilter by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
+    var showSearchBar by remember { mutableStateOf(false) }
     val favoriteIds = remember { mutableStateOf(favoritesManager.getFavoriteIds()) }
     var focusedItem by remember { mutableStateOf<MediaEntry?>(null) }
     var focusedIndex by remember { mutableIntStateOf(101) }
 
-    // Live Clock State
+    // Hero Carousel Index
+    var heroSlideIndex by remember { mutableIntStateOf(0) }
+
+    // Live Clock State (Format matching CobraTV Pro: 8:57 PM Tue, 25 Aug)
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
-        val formatter = java.text.SimpleDateFormat("hh:mm a • EEE, dd MMM", java.util.Locale.getDefault())
+        val formatter = java.text.SimpleDateFormat("h:mm a  EEE, dd MMM", java.util.Locale.getDefault())
         while (true) {
             currentTime = formatter.format(java.util.Date())
             kotlinx.coroutines.delay(1000)
+        }
+    }
+
+    // Auto-cycle Hero Carousel every 8 seconds
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(8000)
+            heroSlideIndex = (heroSlideIndex + 1) % 4
         }
     }
 
@@ -71,8 +98,8 @@ fun HomeScreen(
     }
 
     val countriesList = listOf(
-        "UK" to "🇬🇧 UK Channels",
-        "USA" to "🇺🇸 USA Channels",
+        "UK" to "🇬🇧 UK",
+        "USA" to "🇺🇸 USA",
         "Canada" to "🇨🇦 Canada",
         "Australia" to "🇦🇺 Australia",
         "France" to "🇫🇷 France",
@@ -81,7 +108,7 @@ fun HomeScreen(
         "Italy" to "🇮🇹 Italy"
     )
 
-    // Accurate Country Counts (Exact match to prevent count drift)
+    // Accurate Country Counts
     val countryCounts = remember(liveChannels) {
         countriesList.associate { (code, _) ->
             val count = liveChannels.count { item ->
@@ -92,15 +119,20 @@ fun HomeScreen(
         }
     }
 
-    // Precise Filter Logic (Matches Sidebar numbers 100% identically)
-    val currentItems = remember(selectedTab, selectedFilter, searchQuery, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds.value) {
-        val baseList = when (selectedTab) {
-            Kind.LIVE -> liveChannels
-            Kind.PLUTO -> plutoChannels
-            Kind.SKY -> skyChannels
-            Kind.MOVIE -> movieChannels
-            Kind.SERIES -> seriesChannels
-            Kind.FAVORITES -> {
+    // Dynamic Filter Categories
+    val filterCategories = listOf("All", "News", "Sports", "Movies", "Entertainment", "Kids", "Music", "Documentary")
+
+    // Filter Logic based on Active Section
+    val currentItems = remember(activeSection, selectedFilter, searchQuery, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds.value) {
+        val baseList = when (activeSection) {
+            NavSection.HOME, NavSection.HUB -> skyChannels + plutoChannels.take(40) + liveChannels.take(40) + movieChannels.take(20)
+            NavSection.LIVE -> liveChannels
+            NavSection.PLUTO -> plutoChannels
+            NavSection.SKY -> skyChannels
+            NavSection.MOVIES -> movieChannels
+            NavSection.SERIES -> seriesChannels
+            NavSection.RADIO -> liveChannels.filter { it.group.contains("music", ignoreCase = true) || it.title.contains("radio", ignoreCase = true) }
+            NavSection.FAVORITES -> {
                 val favSet = favoriteIds.value
                 val allKnown = liveChannels + plutoChannels + skyChannels + movieChannels + seriesChannels
                 allKnown.filter { favSet.contains(it.id) }
@@ -119,7 +151,7 @@ fun HomeScreen(
             } else {
                 baseList.filter { item ->
                     item.group.contains(selectedFilter, ignoreCase = true) ||
-                    item.group.equals(selectedFilter, ignoreCase = true)
+                    item.title.contains(selectedFilter, ignoreCase = true)
                 }
             }
         }
@@ -137,7 +169,7 @@ fun HomeScreen(
         }
     }
 
-    // Keep focusedItem and its channel number in sync with filtered list
+    // Keep focusedItem and its channel number in sync
     LaunchedEffect(currentItems) {
         if (currentItems.isNotEmpty() && (focusedItem == null || !currentItems.contains(focusedItem))) {
             focusedItem = currentItems.first()
@@ -148,31 +180,29 @@ fun HomeScreen(
         }
     }
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(BgDark)
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        // Left Navigation Rail (Solid, Clean Sidebar with dynamic country & category list)
-        Column(
-            modifier = Modifier
-                .width(220.dp)
-                .fillMaxHeight()
-                .background(NavRailBg)
-                .border(1.dp, BorderSubtle)
-                .padding(10.dp)
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+        // ==========================================
+        // 1. TOP HORIZONTAL NAVIGATION & ACTION BAR
+        // ==========================================
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // App Branding
+            // App Branding (Merlin TV Pro with Snake/Wizard Cyan Badge)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Box(
                     modifier = Modifier
-                        .size(32.dp)
+                        .size(36.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(PrimaryBlue),
                     contentAlignment = Alignment.Center
@@ -181,305 +211,321 @@ fun HomeScreen(
                         imageVector = Icons.Default.Tv,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
                 Column {
                     Text(
-                        text = "Merlin TV",
+                        text = "MerlinTV",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "PRO",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = AccentSky,
+                        letterSpacing = 1.sp
+                    )
+                }
+            }
+
+            // Horizontal Navigation Menu Tabs (CobraTV Pro Style)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                modifier = Modifier.horizontalScroll(rememberScrollState())
+            ) {
+                TopNavBarItem(
+                    icon = Icons.Default.Home,
+                    label = "Home",
+                    isSelected = activeSection == NavSection.HOME,
+                    onClick = { activeSection = NavSection.HOME; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.LiveTv,
+                    label = "Live",
+                    isSelected = activeSection == NavSection.LIVE,
+                    onClick = { activeSection = NavSection.LIVE; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.Language,
+                    label = "Pluto",
+                    isSelected = activeSection == NavSection.PLUTO,
+                    onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.Sensors,
+                    label = "Sky",
+                    isSelected = activeSection == NavSection.SKY,
+                    onClick = { activeSection = NavSection.SKY; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.PlayCircle,
+                    label = "Movies",
+                    isSelected = activeSection == NavSection.MOVIES,
+                    onClick = { activeSection = NavSection.MOVIES; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.Movie,
+                    label = "Series",
+                    isSelected = activeSection == NavSection.SERIES,
+                    onClick = { activeSection = NavSection.SERIES; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.Radio,
+                    label = "Radio",
+                    isSelected = activeSection == NavSection.RADIO,
+                    onClick = { activeSection = NavSection.RADIO; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.GridView,
+                    label = "Hub",
+                    isSelected = activeSection == NavSection.HUB,
+                    onClick = { activeSection = NavSection.HUB; selectedFilter = "All" }
+                )
+            }
+
+            // Right Quick Actions & Live Clock
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Live Clock Pill
+                Text(
+                    text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(end = 4.dp)
+                )
+
+                // Search Icon
+                IconButton(
+                    onClick = { showSearchBar = !showSearchBar },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (showSearchBar || searchQuery.isNotBlank()) PrimaryBlue else Color(0xFF1E293B))
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = "Search", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+
+                // Update Notification Icon
+                IconButton(
+                    onClick = onOpenUpdateDialog,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (availableUpdate != null) LiveBadgeColor else Color(0xFF1E293B))
+                ) {
+                    Icon(
+                        imageVector = if (availableUpdate != null) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
+                        contentDescription = "Updates",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                // Favorites Heart Icon
+                IconButton(
+                    onClick = {
+                        activeSection = NavSection.FAVORITES
+                        selectedFilter = "All"
+                        refreshFavorites()
+                    },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (activeSection == NavSection.FAVORITES) AccentGold else Color(0xFF1E293B))
+                ) {
+                    Icon(
+                        imageVector = if (activeSection == NavSection.FAVORITES) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        contentDescription = "Favorites",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+
+                // Settings Gear Icon
+                IconButton(
+                    onClick = onOpenSettingsDialog,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1E293B))
+                ) {
+                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+
+        // Expandable Search Bar
+        AnimatedVisibility(visible = showSearchBar) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                TvSearchBar(
+                    query = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    placeholderText = "Search channels, movies, sports...",
+                    modifier = Modifier.width(320.dp)
+                )
+            }
+        }
+
+        // =========================================================
+        // 2. MAIN CONTENT: HOME / HUB HERO VIEW VS. CHANNEL GRID VIEW
+        // =========================================================
+        if (activeSection == NavSection.HOME || activeSection == NavSection.HUB) {
+            // Scrollable Home / Hub Dashboard Layout
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // Hero Feature Banner (CobraTV Pro Style Carousel)
+                val heroSlides = listOf(
+                    Triple("Sky & News Network", "The world, live in 1080p FHD", "Watch live Sky News UK, BBC News, Bloomberg Europe, France 24, DW & breaking global reporting.") to { activeSection = NavSection.SKY },
+                    Triple("Pluto TV FAST Channels", "Binge TV & Unlimited Movies", "Explore hundreds of live FAST feeds across Crime, Drama, Comedy, Documentaries & Classic Hits.") to { activeSection = NavSection.PLUTO },
+                    Triple("Cinema & Feature Films", "Top Movies & Classic Cinema", "Stream curated feature films, classic cinema, action, thriller & sci-fi channels.") to { activeSection = NavSection.MOVIES },
+                    Triple("Worldwide Live TV", "1,500+ Live Broadcast Streams", "Instant live TV from the United Kingdom, USA, Canada, Australia, France, Germany & Europe.") to { activeSection = NavSection.LIVE }
+                )
+
+                val (slideInfo, slideAction) = heroSlides[heroSlideIndex]
+
+                HeroFeatureBanner(
+                    tag = "MerlinTV Hub",
+                    title = slideInfo.second,
+                    subtitle = slideInfo.third,
+                    actionLabel = "Explore ${slideInfo.first}",
+                    activeDotIndex = heroSlideIndex,
+                    totalDots = 4,
+                    onActionClick = slideAction
+                )
+
+                // Featured Hubs Row
+                Text(
+                    text = "Featured Hubs",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    HubShortcutCard(
+                        title = "News Hub",
+                        subtitle = "${skyChannels.size} live channels",
+                        icon = Icons.AutoMirrored.Filled.Feed,
+                        gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.SKY; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "Sports Hub",
+                        subtitle = "Highlights & live action",
+                        icon = Icons.Default.SportsSoccer,
+                        gradientColors = listOf(Color(0xFF059669), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.LIVE; selectedFilter = "Sports" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "Cinema Hub",
+                        subtitle = "${movieChannels.size} feature films",
+                        icon = Icons.Default.Movie,
+                        gradientColors = listOf(Color(0xFF7C3AED), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.MOVIES; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "Pluto TV Hub",
+                        subtitle = "${plutoChannels.size} FAST channels",
+                        icon = Icons.Default.Language,
+                        gradientColors = listOf(Color(0xFFD97706), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "Radio & Music",
+                        subtitle = "24/7 stations & hits",
+                        icon = Icons.Default.Radio,
+                        gradientColors = listOf(Color(0xFFE11D48), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.RADIO; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+                }
+
+                // Recommended Channels Section Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Recommended Channels",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Text(
-                        text = "v${BuildConfig.VERSION_NAME} Premium",
-                        fontSize = 10.sp,
-                        color = PrimaryCyan
+                        text = "${currentItems.size} streams available",
+                        color = AccentSky,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
-            }
 
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // Main Tabs
-            NavRailItem(
-                icon = Icons.Default.LiveTv,
-                label = "Live TV (${liveChannels.size})",
-                isSelected = selectedTab == Kind.LIVE && selectedFilter == "All",
-                onClick = {
-                    selectedTab = Kind.LIVE
-                    selectedFilter = "All"
-                }
-            )
-
-            NavRailItem(
-                icon = Icons.Default.Language,
-                label = "Pluto TV (${plutoChannels.size})",
-                isSelected = selectedTab == Kind.PLUTO && selectedFilter == "All",
-                onClick = {
-                    selectedTab = Kind.PLUTO
-                    selectedFilter = "All"
-                }
-            )
-
-            NavRailItem(
-                icon = Icons.Default.Sensors,
-                label = "Sky & News (${skyChannels.size})",
-                isSelected = selectedTab == Kind.SKY && selectedFilter == "All",
-                onClick = {
-                    selectedTab = Kind.SKY
-                    selectedFilter = "All"
-                }
-            )
-
-            NavRailItem(
-                icon = Icons.Default.PlayCircle,
-                label = "Movies (${movieChannels.size})",
-                isSelected = selectedTab == Kind.MOVIE && selectedFilter == "All",
-                onClick = {
-                    selectedTab = Kind.MOVIE
-                    selectedFilter = "All"
-                }
-            )
-
-            NavRailItem(
-                icon = Icons.Default.Movie,
-                label = "Series (${seriesChannels.size})",
-                isSelected = selectedTab == Kind.SERIES && selectedFilter == "All",
-                onClick = {
-                    selectedTab = Kind.SERIES
-                    selectedFilter = "All"
-                }
-            )
-
-            NavRailItem(
-                icon = Icons.Default.Favorite,
-                label = "Favorites (${favoriteIds.value.size})",
-                isSelected = selectedTab == Kind.FAVORITES,
-                onClick = {
-                    selectedTab = Kind.FAVORITES
-                    selectedFilter = "All"
-                    refreshFavorites()
-                }
-            )
-
-            NavRailItem(
-                icon = Icons.Default.Settings,
-                label = "Settings",
-                isSelected = false,
-                onClick = onOpenSettingsDialog
-            )
-
-            Spacer(modifier = Modifier.height(4.dp))
-            HorizontalDivider(color = BorderSubtle)
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "REGIONS & COUNTRIES",
-                color = TextMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 6.dp)
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // Country list
-            countriesList.forEach { (code, name) ->
-                val count = countryCounts[code] ?: 0
-                NavRailItem(
-                    icon = Icons.Default.Flag,
-                    label = if (count > 0) "$name ($count)" else name,
-                    isSelected = selectedTab == Kind.LIVE && selectedFilter == code,
-                    onClick = {
-                        selectedTab = Kind.LIVE
-                        selectedFilter = code
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            HorizontalDivider(color = BorderSubtle)
-            Spacer(modifier = Modifier.height(4.dp))
-
-            Text(
-                text = "GENRES & CATEGORIES",
-                color = TextMuted,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(horizontal = 6.dp)
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            // Category filters
-            val categories = listOf(
-                "Entertainment" to Icons.Default.TheaterComedy,
-                "News" to Icons.AutoMirrored.Filled.Feed,
-                "Sports" to Icons.Default.SportsSoccer,
-                "Movies" to Icons.Default.MovieCreation,
-                "Kids" to Icons.Default.ChildCare,
-                "Music" to Icons.Default.MusicNote,
-                "Science" to Icons.Default.Science,
-                "Documentary" to Icons.AutoMirrored.Filled.MenuBook
-            )
-
-            categories.forEach { (cat, icon) ->
-                NavRailItem(
-                    icon = icon,
-                    label = cat,
-                    isSelected = selectedTab == Kind.LIVE && selectedFilter.equals(cat, ignoreCase = true),
-                    onClick = {
-                        selectedTab = Kind.LIVE
-                        selectedFilter = cat
-                    }
-                )
-            }
-        }
-
-        // Right Main Content Area
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            // Offline banner
-            AnimatedVisibility(
-                visible = !isOnline,
-                enter = androidx.compose.animation.slideInVertically() + androidx.compose.animation.fadeIn(),
-                exit = androidx.compose.animation.slideOutVertically() + androidx.compose.animation.fadeOut()
-            ) {
-                Row(
+                // Recommended Grid in Home
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(5),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFFB91C1C))
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        .height(360.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.WifiOff,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "No internet connection — cached channels available",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-            }
-
-            // Top Bar: Live Clock + Active Filter Badge + Check Updates Button + Search Bar + Refresh
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Live Clock & Active Category Pill
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFF1E2433))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
-                            color = AccentSky,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold
+                    itemsIndexed(
+                        items = currentItems.take(15),
+                        key = { index, it -> "${it.id}-${it.url}-$index" }
+                    ) { index, item ->
+                        val chNum = 101 + index
+                        ChannelGridCard(
+                            item = item,
+                            channelNumber = chNum,
+                            isFavorite = favoriteIds.value.contains(item.id),
+                            onToggleFavorite = {
+                                favoritesManager.toggleFavorite(item.id)
+                                refreshFavorites()
+                            },
+                            onFocusChange = {
+                                focusedItem = item
+                                focusedIndex = chNum
+                            },
+                            onClick = {
+                                onSelectChannel(item, currentItems)
+                            }
                         )
-                    }
-
-                    val filterLabel = if (selectedFilter != "All") {
-                        val cName = countriesList.find { it.first == selectedFilter }?.second ?: selectedFilter
-                        "$cName · ${currentItems.size} items"
-                    } else {
-                        when (selectedTab) {
-                            Kind.LIVE -> "All Live TV · ${currentItems.size}"
-                            Kind.PLUTO -> "Pluto TV Channels · ${currentItems.size}"
-                            Kind.SKY -> "Sky & News Network · ${currentItems.size}"
-                            Kind.MOVIE -> "All Movies · ${currentItems.size}"
-                            Kind.SERIES -> "All Series · ${currentItems.size}"
-                            Kind.FAVORITES -> "Favorites · ${currentItems.size}"
-                        }
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(6.dp))
-                            .background(PrimaryBlue.copy(alpha = 0.15f))
-                            .border(1.dp, PrimaryBlue.copy(alpha = 0.6f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    ) {
-                        Text(
-                            text = filterLabel,
-                            color = TextPrimary,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // Software Update Button
-                    Button(
-                        onClick = onOpenUpdateDialog,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (availableUpdate != null) LiveBadgeColor else Color(0xFF1E2433)
-                        ),
-                        shape = RoundedCornerShape(8.dp),
-                        border = BorderStroke(1.dp, BorderSubtle),
-                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                        modifier = Modifier.height(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (availableUpdate != null) Icons.Default.SystemUpdate else Icons.Default.Sync,
-                            contentDescription = null,
-                            tint = if (availableUpdate != null) Color.White else AccentSky,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = if (availableUpdate != null) "Update v${availableUpdate.version}" else "v${BuildConfig.VERSION_NAME}",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 11.sp
-                        )
-                    }
-
-                    TvSearchBar(
-                        query = searchQuery,
-                        onQueryChange = { searchQuery = it },
-                        placeholderText = "Search ${currentItems.size} items...",
-                        modifier = Modifier.width(220.dp)
-                    )
-
-                    IconButton(
-                        onClick = onRefreshChannels,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(SurfaceDark)
-                            .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
-                    ) {
-                        Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = TextPrimary, modifier = Modifier.size(16.dp))
                     }
                 }
             }
+        } else {
+            // =========================================================
+            // 3. DEDICATED CHANNEL BROWSING VIEW (LIVE / PLUTO / SKY / MOVIES / SERIES)
+            // =========================================================
 
-            // Compact Focused Channel Header Bar (Sleek & Space-Efficient)
+            // Focused Channel Header Bar (Compact EPG Now & Next)
             FocusedChannelHeaderBar(
                 item = focusedItem,
                 channelNumber = focusedIndex,
@@ -488,7 +534,61 @@ fun HomeScreen(
                 }
             )
 
-            // Channels Grid (5 Columns, Clean Wide 16:9 Tiles)
+            // Horizontal Filter Chips Row (Countries & Categories)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Category Pills
+                filterCategories.forEach { cat ->
+                    val isSelected = selectedFilter.equals(cat, ignoreCase = true)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                            .clickable { selectedFilter = cat }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = cat,
+                            color = if (isSelected) Color.White else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.width(4.dp))
+                Box(modifier = Modifier.width(1.dp).height(20.dp).background(BorderSubtle))
+                Spacer(modifier = Modifier.width(4.dp))
+
+                // Country Pills
+                countriesList.forEach { (code, label) ->
+                    val isSelected = selectedFilter.equals(code, ignoreCase = true)
+                    val count = countryCounts[code] ?: 0
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                            .clickable { selectedFilter = code }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = if (count > 0) "$label ($count)" else label,
+                            color = if (isSelected) Color.White else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // 5-Column Channel Grid
             if (isLoading && currentItems.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -496,13 +596,7 @@ fun HomeScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        CircularProgressIndicator(color = AccentSky, modifier = Modifier.size(36.dp))
-                        Text("Loading channel catalogs...", color = TextSecondary, fontSize = 13.sp)
-                    }
+                    CircularProgressIndicator(color = AccentSky, modifier = Modifier.size(36.dp))
                 }
             } else if (currentItems.isEmpty()) {
                 Box(
@@ -531,7 +625,7 @@ fun HomeScreen(
                 ) {
                     itemsIndexed(
                         items = currentItems,
-                        key = { _, it -> "${it.id}-${it.url}" }
+                        key = { index, it -> "${it.id}-${it.url}-$index" }
                     ) { index, item ->
                         val chNum = 101 + index
                         ChannelGridCard(
