@@ -51,6 +51,8 @@ object CatalogRepository {
     private const val RAKUTEN_UK_PLAYLIST = "https://www.apsattv.com/rakutentv-uk.m3u"
     private const val WORLDWIDE_ALL_PLAYLIST = "https://iptv-org.github.io/iptv/index.m3u"
     private const val FREE_TV_PLAYLIST = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
+    private const val PLEX_ALL_PLAYLIST = "https://i.mjh.nz/Plex/all.m3u8"
+    const val PLEX_EPG_URL = "https://i.mjh.nz/Plex/all.xml"
     private const val PLUTO_GB_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_gb.m3u"
     private const val PLUTO_US_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_us.m3u"
 
@@ -340,7 +342,13 @@ object CatalogRepository {
             val freeTvTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, FREE_TV_PLAYLIST)
                 if (body.isNotBlank()) {
-                    M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.LIVE, sourceLabel = "Free-TV")
+                    val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.LIVE, sourceLabel = "Free-TV")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank() && !entry.group.equals("General", ignoreCase = true))
+                            "Free-TV | ${entry.group.trim().uppercase()}"
+                        else "Free-TV | BROADCAST"
+                        entry.copy(group = grp)
+                    }
                 } else {
                     emptyList()
                 }
@@ -471,6 +479,18 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val plexAllTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, PLEX_ALL_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Plex", defaultKind = Kind.PLUTO, sourceLabel = "Plex FAST")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Plex | ${entry.group.trim().uppercase()}" else "Plex | FAST"
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                    }
+                } else emptyList()
+            }
+
             val plutoGbTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, PLUTO_GB_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -499,6 +519,7 @@ object CatalogRepository {
             allEntries.addAll(samsungAllTask.await())
             allEntries.addAll(xiaomiTask.await())
             allEntries.addAll(rakutenTask.await())
+            allEntries.addAll(plexAllTask.await())
             allEntries.addAll(plutoGbTask.await())
             allEntries.addAll(plutoUsTask.await())
         }

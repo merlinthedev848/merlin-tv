@@ -1,8 +1,8 @@
 {
-  "version": "1.4.2",
-  "versionCode": 142,
+  "version": "1.4.3",
+  "versionCode": 143,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.2",
-  "releaseNotes": "Merlin TV v1.4.2: Expanded Global & FAST Catalog Integration. Preloaded with Pluto TV Worldwide, Samsung TV Plus All, Xiaomi TV FAST, Rakuten TV UK, Worldwide Live Channels, USA Broadcast, News, Documentaries, Music, Comedy, and Cinema feeds.",
-  "publishedAt": "2026-09-20T17:48:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.3",
+  "releaseNotes": "Merlin TV v1.4.3: Added Plex FAST Worldwide Channels, Free-TV Curated Broadcast Feeds, and Plex XMLTV EPG Support.",
+  "publishedAt": "2026-09-20T17:50:00Z"
 }
