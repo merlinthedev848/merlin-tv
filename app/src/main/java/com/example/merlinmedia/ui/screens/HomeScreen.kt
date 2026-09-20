@@ -102,10 +102,21 @@ fun HomeScreen(
         "USA" to "🇺🇸 USA",
         "Canada" to "🇨🇦 Canada",
         "Australia" to "🇦🇺 Australia",
+        "New Zealand" to "🇳🇿 NZ",
+        "Ireland" to "🇮🇪 Ireland",
         "France" to "🇫🇷 France",
         "Germany" to "🇩🇪 Germany",
+        "Italy" to "🇮🇹 Italy",
         "Spain" to "🇪🇸 Spain",
-        "Italy" to "🇮🇹 Italy"
+        "Portugal" to "🇵🇹 Portugal",
+        "Netherlands" to "🇳🇱 Netherlands",
+        "South Africa" to "🇿🇦 South Africa",
+        "India" to "🇮🇳 India",
+        "Japan" to "🇯🇵 Japan",
+        "South Korea" to "🇰🇷 Korea",
+        "Philippines" to "🇵🇭 Philippines",
+        "Brazil" to "🇧🇷 Brazil",
+        "Mexico" to "🇲🇽 Mexico"
     )
 
     // Accurate Country Counts
@@ -119,8 +130,12 @@ fun HomeScreen(
         }
     }
 
-    // Dynamic Filter Categories
-    val filterCategories = listOf("All", "News", "Sports", "Movies", "Entertainment", "Kids", "Music", "Documentary")
+    // Dynamic Filter Categories (Full Public FAST & IPTV Taxonomy)
+    val filterCategories = listOf(
+        "All", "News", "Sports", "Movies", "Series", "Entertainment",
+        "Documentary", "Kids", "Animation", "Comedy", "Music", "Cooking",
+        "Travel", "Science", "Education", "Business", "Weather", "Classic", "Auto"
+    )
 
     // Filter Logic based on Active Section
     val currentItems = remember(activeSection, selectedFilter, searchQuery, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds.value) {
@@ -407,7 +422,7 @@ fun HomeScreen(
                     onActionClick = slideAction
                 )
 
-                // Featured Hubs Row
+                // Featured Hubs Row (CobraTV Pro 8-Card Showcase)
                 Text(
                     text = "Featured Hubs",
                     style = MaterialTheme.typography.titleMedium,
@@ -422,10 +437,19 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     HubShortcutCard(
-                        title = "News Hub",
-                        subtitle = "${skyChannels.size} live channels",
-                        icon = Icons.AutoMirrored.Filled.Feed,
+                        title = "Live Cams & World",
+                        subtitle = "Travel & city live streams",
+                        icon = Icons.Default.Videocam,
                         gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.LIVE; selectedFilter = "Travel" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "News Hub",
+                        subtitle = "${skyChannels.size} live news feeds",
+                        icon = Icons.AutoMirrored.Filled.Feed,
+                        gradientColors = listOf(Color(0xFF0369A1), Color(0xFF0F172A)),
                         onClick = { activeSection = NavSection.SKY; selectedFilter = "All" },
                         modifier = Modifier.width(220.dp)
                     )
@@ -440,6 +464,15 @@ fun HomeScreen(
                     )
 
                     HubShortcutCard(
+                        title = "Game Shows & Ent.",
+                        subtitle = "Comedy & entertainment",
+                        icon = Icons.Default.EmojiEvents,
+                        gradientColors = listOf(Color(0xFFD97706), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "Entertainment" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
                         title = "Cinema Hub",
                         subtitle = "${movieChannels.size} feature films",
                         icon = Icons.Default.Movie,
@@ -449,11 +482,20 @@ fun HomeScreen(
                     )
 
                     HubShortcutCard(
-                        title = "Pluto TV Hub",
-                        subtitle = "${plutoChannels.size} FAST channels",
-                        icon = Icons.Default.Language,
-                        gradientColors = listOf(Color(0xFFD97706), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" },
+                        title = "Series & Binge TV",
+                        subtitle = "${seriesChannels.size} streaming series",
+                        icon = Icons.Default.Tv,
+                        gradientColors = listOf(Color(0xFF4F46E5), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "Wildlife & Docs",
+                        subtitle = "Nature & science docs",
+                        icon = Icons.Default.Pets,
+                        gradientColors = listOf(Color(0xFFEA580C), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "Documentary" },
                         modifier = Modifier.width(220.dp)
                     )
 

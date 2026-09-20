@@ -27,10 +27,21 @@ object CatalogRepository {
         "USA" to "https://iptv-org.github.io/iptv/countries/us.m3u",
         "Canada" to "https://iptv-org.github.io/iptv/countries/ca.m3u",
         "Australia" to "https://iptv-org.github.io/iptv/countries/au.m3u",
+        "New Zealand" to "https://iptv-org.github.io/iptv/countries/nz.m3u",
+        "Ireland" to "https://iptv-org.github.io/iptv/countries/ie.m3u",
         "France" to "https://iptv-org.github.io/iptv/countries/fr.m3u",
         "Germany" to "https://iptv-org.github.io/iptv/countries/de.m3u",
+        "Italy" to "https://iptv-org.github.io/iptv/countries/it.m3u",
         "Spain" to "https://iptv-org.github.io/iptv/countries/es.m3u",
-        "Italy" to "https://iptv-org.github.io/iptv/countries/it.m3u"
+        "Portugal" to "https://iptv-org.github.io/iptv/countries/pt.m3u",
+        "Netherlands" to "https://iptv-org.github.io/iptv/countries/nl.m3u",
+        "South Africa" to "https://iptv-org.github.io/iptv/countries/za.m3u",
+        "India" to "https://iptv-org.github.io/iptv/countries/in.m3u",
+        "Japan" to "https://iptv-org.github.io/iptv/countries/jp.m3u",
+        "South Korea" to "https://iptv-org.github.io/iptv/countries/kr.m3u",
+        "Philippines" to "https://iptv-org.github.io/iptv/countries/ph.m3u",
+        "Brazil" to "https://iptv-org.github.io/iptv/countries/br.m3u",
+        "Mexico" to "https://iptv-org.github.io/iptv/countries/mx.m3u"
     )
 
     private const val FREE_TV_PLAYLIST = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
@@ -40,11 +51,25 @@ object CatalogRepository {
     private const val SAMSUNG_US_PLAYLIST = "https://i.mjh.nz/SamsungTVPlus/us.m3u8"
     private const val PLEX_GB_PLAYLIST = "https://i.mjh.nz/Plex/gb.m3u8"
     private const val PLEX_US_PLAYLIST = "https://i.mjh.nz/Plex/us.m3u8"
+
+    private const val NEWS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/news.m3u"
+    private const val SPORTS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/sports.m3u"
     private const val MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/movies.m3u"
     private const val CLASSIC_MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/classic.m3u"
     private const val SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/series.m3u"
-    private const val ANIMATION_SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/animation.m3u"
+    private const val ENTERTAINMENT_PLAYLIST = "https://iptv-org.github.io/iptv/categories/entertainment.m3u"
     private const val DOCUMENTARY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/documentary.m3u"
+    private const val KIDS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/kids.m3u"
+    private const val ANIMATION_SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/animation.m3u"
+    private const val COMEDY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/comedy.m3u"
+    private const val MUSIC_PLAYLIST = "https://iptv-org.github.io/iptv/categories/music.m3u"
+    private const val COOKING_PLAYLIST = "https://iptv-org.github.io/iptv/categories/cooking.m3u"
+    private const val TRAVEL_PLAYLIST = "https://iptv-org.github.io/iptv/categories/travel.m3u"
+    private const val SCIENCE_PLAYLIST = "https://iptv-org.github.io/iptv/categories/science.m3u"
+    private const val EDUCATION_PLAYLIST = "https://iptv-org.github.io/iptv/categories/education.m3u"
+    private const val BUSINESS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/business.m3u"
+    private const val WEATHER_PLAYLIST = "https://iptv-org.github.io/iptv/categories/weather.m3u"
+    private const val AUTO_PLAYLIST = "https://iptv-org.github.io/iptv/categories/auto.m3u"
 
     @Volatile
     private var cachedLiveChannels: List<MediaEntry> = emptyList()
@@ -336,6 +361,13 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val comedyTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, COMEDY_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Comedy", defaultKind = Kind.MOVIE, sourceLabel = "Comedy Movies")
+                } else emptyList()
+            }
+
             val samsungMoviesTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, SAMSUNG_GB_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -362,6 +394,7 @@ object CatalogRepository {
 
             allEntries.addAll(moviesTask.await())
             allEntries.addAll(classicTask.await())
+            allEntries.addAll(comedyTask.await())
             allEntries.addAll(samsungMoviesTask.await())
             allEntries.addAll(plexMoviesTask.await())
         }
@@ -400,10 +433,24 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val entertainmentTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, ENTERTAINMENT_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Entertainment", defaultKind = Kind.SERIES, sourceLabel = "Entertainment")
+                } else emptyList()
+            }
+
             val animationTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, ANIMATION_SERIES_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Animation", defaultKind = Kind.SERIES, sourceLabel = "Animation")
+                } else emptyList()
+            }
+
+            val kidsTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, KIDS_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Kids", defaultKind = Kind.SERIES, sourceLabel = "Kids TV")
                 } else emptyList()
             }
 
@@ -440,7 +487,9 @@ object CatalogRepository {
             }
 
             allEntries.addAll(seriesTask.await())
+            allEntries.addAll(entertainmentTask.await())
             allEntries.addAll(animationTask.await())
+            allEntries.addAll(kidsTask.await())
             allEntries.addAll(docTask.await())
             allEntries.addAll(samsungSeriesTask.await())
             allEntries.addAll(plexSeriesTask.await())
