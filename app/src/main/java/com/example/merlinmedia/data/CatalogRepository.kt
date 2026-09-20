@@ -44,25 +44,29 @@ object CatalogRepository {
         "Mexico" to "https://iptv-org.github.io/iptv/countries/mx.m3u"
     )
 
+    // FAST & Provider Feeds
+    private const val PLUTO_ALL_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/plutotv_all.m3u"
+    private const val SAMSUNG_ALL_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/samsungtvplus_all.m3u"
+    private const val XIAOMI_PLAYLIST = "https://www.apsattv.com/xiaomi.m3u"
+    private const val RAKUTEN_UK_PLAYLIST = "https://www.apsattv.com/rakutentv-uk.m3u"
+    private const val WORLDWIDE_ALL_PLAYLIST = "https://iptv-org.github.io/iptv/index.m3u"
     private const val FREE_TV_PLAYLIST = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
     private const val PLUTO_GB_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_gb.m3u"
     private const val PLUTO_US_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_us.m3u"
-    private const val SAMSUNG_GB_PLAYLIST = "https://i.mjh.nz/SamsungTVPlus/gb.m3u8"
-    private const val SAMSUNG_US_PLAYLIST = "https://i.mjh.nz/SamsungTVPlus/us.m3u8"
-    private const val PLEX_GB_PLAYLIST = "https://i.mjh.nz/Plex/gb.m3u8"
-    private const val PLEX_US_PLAYLIST = "https://i.mjh.nz/Plex/us.m3u8"
 
-    private const val NEWS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/news.m3u"
-    private const val SPORTS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/sports.m3u"
+    // Categorized Feeds
     private const val MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/movies.m3u"
+    private const val NEWS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/news.m3u"
+    private const val DOCUMENTARY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/documentary.m3u"
+    private const val MUSIC_PLAYLIST = "https://iptv-org.github.io/iptv/categories/music.m3u"
+    private const val COMEDY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/comedy.m3u"
+    private const val SPORTS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/sports.m3u"
+    private const val USA_COUNTRY_PLAYLIST = "https://iptv-org.github.io/iptv/countries/us.m3u"
     private const val CLASSIC_MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/classic.m3u"
     private const val SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/series.m3u"
     private const val ENTERTAINMENT_PLAYLIST = "https://iptv-org.github.io/iptv/categories/entertainment.m3u"
-    private const val DOCUMENTARY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/documentary.m3u"
     private const val KIDS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/kids.m3u"
     private const val ANIMATION_SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/animation.m3u"
-    private const val COMEDY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/comedy.m3u"
-    private const val MUSIC_PLAYLIST = "https://iptv-org.github.io/iptv/categories/music.m3u"
     private const val COOKING_PLAYLIST = "https://iptv-org.github.io/iptv/categories/cooking.m3u"
     private const val TRAVEL_PLAYLIST = "https://iptv-org.github.io/iptv/categories/travel.m3u"
     private const val SCIENCE_PLAYLIST = "https://iptv-org.github.io/iptv/categories/science.m3u"
@@ -126,9 +130,10 @@ object CatalogRepository {
 
     fun sanitizeChannelTitle(raw: String): String {
         return raw
-            .replace(Regex("""\[.*?\]"""), "")
-            .replace(Regex("""\(.*?\)"""), "")
-            .replace(Regex("""\s+"""), " ")
+            .replace(Regex("\\[.*?\\]"), "")
+            .replace(Regex("\\(.*?p\\)", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\(.*?fps\\)", RegexOption.IGNORE_CASE), "")
+            .replace(Regex("\\s+"), " ")
             .trim()
     }
 
@@ -253,6 +258,19 @@ object CatalogRepository {
                     }
                 }
 
+            val usaTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, USA_COUNTRY_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "USA", defaultKind = Kind.LIVE, sourceLabel = "iptv-org USA")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank() && !entry.group.equals("General", ignoreCase = true))
+                            "USA | ${entry.group.trim().uppercase()}"
+                        else "USA | BROADCAST"
+                        entry.copy(country = "USA", group = grp)
+                    }
+                } else emptyList()
+            }
+
             val sportsTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, SPORTS_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -275,6 +293,39 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val documentaryTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, DOCUMENTARY_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Docs", defaultKind = Kind.LIVE, sourceLabel = "iptv-org Docs")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Documentary | ${entry.group.trim().uppercase()}" else "Documentary | NATURE & SCIENCE"
+                        entry.copy(group = grp, country = entry.country.ifBlank { "Global" })
+                    }
+                } else emptyList()
+            }
+
+            val musicTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, MUSIC_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Music", defaultKind = Kind.LIVE, sourceLabel = "iptv-org Music")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Music | ${entry.group.trim().uppercase()}" else "Music | 24/7 HITS"
+                        entry.copy(group = grp, country = entry.country.ifBlank { "Global" })
+                    }
+                } else emptyList()
+            }
+
+            val comedyTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, COMEDY_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Comedy", defaultKind = Kind.LIVE, sourceLabel = "iptv-org Comedy")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Comedy | ${entry.group.trim().uppercase()}" else "Comedy | SITCOMS & HUMOUR"
+                        entry.copy(group = grp, country = entry.country.ifBlank { "Global" })
+                    }
+                } else emptyList()
+            }
+
             val autoTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, AUTO_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -290,6 +341,15 @@ object CatalogRepository {
                 val body = fetchM3uContent(context, FREE_TV_PLAYLIST)
                 if (body.isNotBlank()) {
                     M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.LIVE, sourceLabel = "Free-TV")
+                } else {
+                    emptyList()
+                }
+            }
+
+            val worldwideTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, WORLDWIDE_ALL_PLAYLIST)
+                if (body.isNotBlank()) {
+                    M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.LIVE, sourceLabel = "Worldwide")
                 } else {
                     emptyList()
                 }
@@ -320,10 +380,15 @@ object CatalogRepository {
                 val channels = task.await()
                 channels.forEach { processAndAdd(it) }
             }
+            usaTask.await().forEach { processAndAdd(it) }
             sportsTask.await().forEach { processAndAdd(it) }
             newsTask.await().forEach { processAndAdd(it) }
+            documentaryTask.await().forEach { processAndAdd(it) }
+            musicTask.await().forEach { processAndAdd(it) }
+            comedyTask.await().forEach { processAndAdd(it) }
             autoTask.await().forEach { processAndAdd(it) }
             freeTvTask.await().forEach { processAndAdd(it) }
+            worldwideTask.await().forEach { processAndAdd(it) }
             customTasks.forEach { task ->
                 task.await().forEach { processAndAdd(it) }
             }
@@ -340,7 +405,7 @@ object CatalogRepository {
     }
 
     /**
-     * Load dedicated Pluto TV channels (UK + US Feeds categorized into Movies, Crime, Drama, Comedy, Sports, etc.)
+     * Load dedicated Pluto TV and FAST channels (Pluto All, Samsung TV+, Xiaomi, Rakuten TV UK, etc.)
      */
     suspend fun loadPluto(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedPlutoChannels.isNotEmpty() && !forceRefresh) {
@@ -358,6 +423,54 @@ object CatalogRepository {
         val allEntries = mutableListOf<MediaEntry>()
 
         coroutineScope {
+            val plutoAllTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, PLUTO_ALL_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Pluto", defaultKind = Kind.PLUTO, sourceLabel = "Pluto TV")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "720p")
+                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                    }
+                } else emptyList()
+            }
+
+            val samsungAllTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, SAMSUNG_ALL_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Samsung", defaultKind = Kind.PLUTO, sourceLabel = "Samsung TV+")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Samsung | ${entry.group.trim().uppercase()}" else "Samsung | GENERAL"
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                    }
+                } else emptyList()
+            }
+
+            val xiaomiTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, XIAOMI_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Xiaomi", defaultKind = Kind.PLUTO, sourceLabel = "Xiaomi TV")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Xiaomi | ${entry.group.trim().uppercase()}" else "Xiaomi | FAST"
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                    }
+                } else emptyList()
+            }
+
+            val rakutenTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, RAKUTEN_UK_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "UK", defaultKind = Kind.PLUTO, sourceLabel = "Rakuten TV")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Rakuten | ${entry.group.trim().uppercase()}" else "Rakuten | UK"
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, country = "UK", group = grp, quality = qual)
+                    }
+                } else emptyList()
+            }
+
             val plutoGbTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, PLUTO_GB_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -382,6 +495,10 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            allEntries.addAll(plutoAllTask.await())
+            allEntries.addAll(samsungAllTask.await())
+            allEntries.addAll(xiaomiTask.await())
+            allEntries.addAll(rakutenTask.await())
             allEntries.addAll(plutoGbTask.await())
             allEntries.addAll(plutoUsTask.await())
         }
@@ -436,6 +553,28 @@ object CatalogRepository {
 
         val allEntries = mutableListOf<MediaEntry>()
         allEntries.addAll(curatedMovies)
+
+        coroutineScope {
+            val movieChannelsTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, MOVIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.MOVIE, sourceLabel = "Cinema")
+                    parsed.map { entry ->
+                        val clean = sanitizeChannelTitle(entry.title)
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(
+                            title = clean,
+                            type = Kind.MOVIE,
+                            isVod = true,
+                            quality = qual,
+                            genre = if (entry.genre.isNotBlank()) entry.genre else (if (entry.group.isNotBlank() && !entry.group.equals("General", ignoreCase = true)) entry.group else "Feature Film"),
+                            description = if (entry.description.isNotBlank()) entry.description else "Stream this feature release in high quality directly on Merlin TV."
+                        )
+                    }
+                } else emptyList()
+            }
+            allEntries.addAll(movieChannelsTask.await())
+        }
 
         val distinctList = allEntries.distinctBy { it.url }
         cachedMovieChannels = distinctList

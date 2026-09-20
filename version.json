@@ -1,8 +1,8 @@
 {
-  "version": "1.4.1",
-  "versionCode": 141,
+  "version": "1.4.2",
+  "versionCode": 142,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.1",
-  "releaseNotes": "Merlin TV v1.4.1: Stream Quality Badges & Channel Logo upgrade. Displays live channel logos with dedicated in-box resolution badges (4K UHD, 1080p FHD, 720p HD, SD) across channel grid cards, EPG header, and in-player quick guide.",
-  "publishedAt": "2026-09-20T17:43:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.2",
+  "releaseNotes": "Merlin TV v1.4.2: Expanded Global & FAST Catalog Integration. Preloaded with Pluto TV Worldwide, Samsung TV Plus All, Xiaomi TV FAST, Rakuten TV UK, Worldwide Live Channels, USA Broadcast, News, Documentaries, Music, Comedy, and Cinema feeds.",
+  "publishedAt": "2026-09-20T17:48:00Z"
 }
