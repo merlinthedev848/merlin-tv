@@ -89,7 +89,7 @@ fun TopNavBarItem(
 }
 
 /**
- * CobraTV Pro Style Hero Feature Showcase Banner with Gradient Backdrop & CTA Button.
+ * Modern Hero Feature Showcase Banner with Gradient Backdrop & CTA Button.
  */
 @Composable
 fun HeroFeatureBanner(
@@ -219,7 +219,7 @@ fun HeroFeatureBanner(
 }
 
 /**
- * CobraTV Pro Style Featured Hub Shortcut Card (News Hub, Sports Hub, Cinema Hub, etc.)
+ * Modern Featured Hub Shortcut Card (News Hub, Sports Hub, Cinema Hub, etc.)
  */
 @Composable
 fun HubShortcutCard(
@@ -303,7 +303,7 @@ fun HubShortcutCard(
 }
 
 /**
- * Sleek, compact Header Details Bar with Cobra/TiviMate style EPG 'Now & Next' timeline.
+ * Sleek, compact Header Details Bar with EPG 'Now & Next' timeline.
  * Takes up minimal vertical space (~64dp) leaving maximum room for channel browsing.
  */
 @Composable
@@ -721,7 +721,7 @@ fun TvSearchBar(
 }
 
 /**
- * Cobra/TiviMate Style Quick Channel Guide Item for in-player overlay drawer.
+ * Modern Quick Channel Guide Item for in-player overlay drawer.
  */
 @Composable
 fun QuickChannelDrawerItem(

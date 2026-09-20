@@ -5,7 +5,7 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 
-// Cobra / TiviMate Dark Palette & High-Contrast Accents
+// Modern Dark Palette & High-Contrast Accents
 val BgDark = Color(0xFF0A0D14)
 val NavRailBg = Color(0xFF0F131C)
 val SurfaceDark = Color(0xFF141A26)

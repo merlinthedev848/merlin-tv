@@ -614,7 +614,7 @@ fun PlayerScreen(
             }
         }
 
-        // Cobra / TiviMate Style Semi-Transparent Glass Channel Guide Drawer
+        // Semi-Transparent Glass Quick Channel Guide Drawer
         AnimatedVisibility(
             visible = showMiniGuide,
             enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(animationSpec = tween(200)),

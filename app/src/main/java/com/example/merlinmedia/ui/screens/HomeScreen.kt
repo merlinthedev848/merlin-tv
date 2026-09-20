@@ -75,7 +75,7 @@ fun HomeScreen(
     // Hero Carousel Index
     var heroSlideIndex by remember { mutableIntStateOf(0) }
 
-    // Live Clock State (Format matching CobraTV Pro: 8:57 PM Tue, 25 Aug)
+    // Live Clock State (Format: 8:57 PM Tue, 25 Aug)
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         val formatter = java.text.SimpleDateFormat("h:mm a  EEE, dd MMM", java.util.Locale.getDefault())
@@ -246,7 +246,7 @@ fun HomeScreen(
                 }
             }
 
-            // Horizontal Navigation Menu Tabs (CobraTV Pro Style)
+            // Horizontal Navigation Menu Tabs
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -402,7 +402,7 @@ fun HomeScreen(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Hero Feature Banner (CobraTV Pro Style Carousel)
+                // Hero Feature Banner Carousel
                 val heroSlides = listOf(
                     Triple("Sky & News Network", "The world, live in 1080p FHD", "Watch live Sky News UK, BBC News, Bloomberg Europe, France 24, DW & breaking global reporting.") to { activeSection = NavSection.SKY },
                     Triple("Pluto TV FAST Channels", "Binge TV & Unlimited Movies", "Explore hundreds of live FAST feeds across Crime, Drama, Comedy, Documentaries & Classic Hits.") to { activeSection = NavSection.PLUTO },
@@ -422,7 +422,7 @@ fun HomeScreen(
                     onActionClick = slideAction
                 )
 
-                // Featured Hubs Row (CobraTV Pro 8-Card Showcase)
+                // Featured Hubs Row (8-Card Showcase)
                 Text(
                     text = "Featured Hubs",
                     style = MaterialTheme.typography.titleMedium,
