@@ -446,7 +446,7 @@ fun PlayerScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    if (currentItem.type == Kind.LIVE) {
+                                    if (currentItem.type == Kind.LIVE || currentItem.type == Kind.PLUTO || currentItem.type == Kind.SKY) {
                                         Box(
                                             modifier = Modifier
                                                 .clip(RoundedCornerShape(4.dp))
@@ -456,6 +456,7 @@ fun PlayerScreen(
                                             Text("LIVE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
                                         }
                                     }
+                                    QualityBadge(quality = currentItem.quality.ifBlank { "1080p" })
                                     if (currentItem.country.isNotBlank()) {
                                         Text(currentItem.country, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                     }

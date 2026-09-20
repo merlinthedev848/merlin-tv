@@ -427,20 +427,8 @@ fun FocusedChannelHeaderBar(
                             }
                         }
 
-                        // Resolution Badge
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(4.dp))
-                                .background(if (is4k) Quality4kBadge else if (isFhd) QualityFhdBadge else Color(0xFF334155))
-                                .padding(horizontal = 6.dp, vertical = 1.dp)
-                        ) {
-                            Text(
-                                text = if (is4k) "4K UHD" else if (isFhd) "1080p FHD" else "HD 720p",
-                                color = Color.White,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                        // Quality Badge
+                        QualityBadge(quality = item.quality.ifBlank { if (is4k) "4K" else if (isFhd) "1080p" else "720p" })
 
                         if (item.country.isNotBlank()) {
                             Text(
@@ -512,10 +500,51 @@ fun FocusedChannelHeaderBar(
 }
 
 /**
+ * Stream Quality Badge Pill (4K / 1080p / 720p / SD)
+ */
+@Composable
+fun QualityBadge(quality: String, modifier: Modifier = Modifier) {
+    val q = quality.trim().uppercase()
+    val is4k = q.contains("4K") || q.contains("UHD") || q.contains("2160")
+    val isFhd = q.contains("1080") || q.contains("FHD")
+    val isHd = q.contains("720") || q.contains("HD")
+
+    val badgeBg = when {
+        is4k -> Brush.horizontalGradient(listOf(Color(0xFFD97706), Color(0xFFB45309)))
+        isFhd -> Brush.horizontalGradient(listOf(Color(0xFF0284C7), Color(0xFF0369A1)))
+        isHd -> Brush.horizontalGradient(listOf(Color(0xFF0D9488), Color(0xFF0F766E)))
+        else -> Brush.horizontalGradient(listOf(Color(0xFF334155), Color(0xFF1E293B)))
+    }
+    val labelText = when {
+        is4k -> "4K"
+        isFhd -> "1080p"
+        isHd -> "720p"
+        else -> if (quality.isNotBlank()) quality.uppercase() else "HD"
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(badgeBg)
+            .padding(horizontal = 5.dp, vertical = 1.5.dp)
+    ) {
+        Text(
+            text = labelText,
+            color = Color.White,
+            fontSize = 9.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+            letterSpacing = 0.5.sp
+        )
+    }
+}
+
+/**
  * Modern Wide 16:9 Channel Tile.
  * Optimized for Android TV D-Pad navigation:
  * - Shows clear channel number + favorite star
- * - Center channel brand logo (with sleek fallback badge, never an empty void)
+ * - Center prominent channel brand logo (with sleek fallback badge)
+ * - Display stream quality badge (720p / 1080p / 4k) directly in the box
  * - Channel title and non-wrapping LIVE badge
  */
 @Composable
@@ -538,7 +567,7 @@ fun ChannelGridCard(
     }
 
     val scale by animateFloatAsState(
-        targetValue = if (isFocused) 1.04f else 1.0f,
+        targetValue = if (isFocused) 1.05f else 1.0f,
         animationSpec = tween(durationMillis = 120),
         label = "cardScale"
     )
@@ -552,7 +581,7 @@ fun ChannelGridCard(
     Card(
         modifier = modifier
             .scale(scale)
-            .height(108.dp)
+            .height(116.dp)
             .border(if (isFocused) 2.5.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
             .focusable(interactionSource = interactionSource)
@@ -564,10 +593,10 @@ fun ChannelGridCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 10.dp, vertical = 8.dp),
+                .padding(horizontal = 9.dp, vertical = 7.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Header: Channel Number & Favorite Toggle
+            // Top Header: Channel Number on left, Quality Badge & Favorite Star on right
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -587,22 +616,29 @@ fun ChannelGridCard(
                     )
                 }
 
-                IconButton(
-                    onClick = { onToggleFavorite(item) },
-                    modifier = Modifier.size(20.dp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
-                        contentDescription = "Favorite",
-                        tint = if (isFavorite) AccentGold else TextMuted,
-                        modifier = Modifier.size(15.dp)
-                    )
+                    QualityBadge(quality = item.quality.ifBlank { "1080p" })
+
+                    IconButton(
+                        onClick = { onToggleFavorite(item) },
+                        modifier = Modifier.size(18.dp)
+                    ) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                            contentDescription = "Favorite",
+                            tint = if (isFavorite) AccentGold else TextMuted,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
                 }
             }
 
             // Center: Channel Branding / Logo
             val logoBgModifier = if (!item.logo.isNullOrBlank()) {
-                Modifier.background(Color(0xFF0C0F17))
+                Modifier.background(Color(0xFF090D15))
             } else {
                 Modifier.background(Brush.linearGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A))))
             }
@@ -610,8 +646,9 @@ fun ChannelGridCard(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(44.dp)
+                    .height(48.dp)
                     .clip(RoundedCornerShape(6.dp))
+                    .border(0.5.dp, Color(0xFF1E293B), RoundedCornerShape(6.dp))
                     .then(logoBgModifier),
                 contentAlignment = Alignment.Center
             ) {
@@ -627,18 +664,19 @@ fun ChannelGridCard(
                 } else {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        modifier = Modifier.padding(horizontal = 6.dp)
                     ) {
                         Icon(
                             imageVector = Icons.Default.Tv,
                             contentDescription = null,
-                            tint = AccentSky.copy(alpha = 0.7f),
-                            modifier = Modifier.size(14.dp)
+                            tint = AccentSky.copy(alpha = 0.8f),
+                            modifier = Modifier.size(16.dp)
                         )
                         Text(
-                            text = item.title.take(8).uppercase(),
+                            text = item.title.take(10).uppercase(),
                             style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.ExtraBold,
                             color = TextPrimary,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
@@ -664,7 +702,7 @@ fun ChannelGridCard(
                     modifier = Modifier.weight(1f)
                 )
 
-                if (item.type == Kind.LIVE) {
+                if (item.type == Kind.LIVE || item.type == Kind.PLUTO || item.type == Kind.SKY) {
                     Spacer(modifier = Modifier.width(4.dp))
                     Box(
                         modifier = Modifier
@@ -831,11 +869,13 @@ fun QuickChannelDrawerItem(
             }
         }
 
-        // Right side indicators: Playing icon / Favorite
+        // Right side indicators: Quality badge / Playing icon / Favorite
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
+            QualityBadge(quality = item.quality.ifBlank { "1080p" })
+
             if (isCurrentPlaying) {
                 Icon(
                     imageVector = Icons.Default.PlayArrow,

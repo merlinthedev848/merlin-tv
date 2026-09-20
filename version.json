@@ -1,8 +1,8 @@
 {
-  "version": "1.4.0",
-  "versionCode": 140,
+  "version": "1.4.1",
+  "versionCode": 141,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.0",
-  "releaseNotes": "Merlin TV v1.4.0: Complete True VOD and Categorized Live TV overhaul. Features dedicated On-Demand Movies section with 2:3 vertical posters, synopses, ratings, and instant playback; dedicated On-Demand TV Series section with season/episode selector modal; and cleanly categorized, deduplicated Live TV with noise-free stream titles and instant country filtering.",
-  "publishedAt": "2026-09-20T15:46:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.1",
+  "releaseNotes": "Merlin TV v1.4.1: Stream Quality Badges & Channel Logo upgrade. Displays live channel logos with dedicated in-box resolution badges (4K UHD, 1080p FHD, 720p HD, SD) across channel grid cards, EPG header, and in-player quick guide.",
+  "publishedAt": "2026-09-20T17:43:00Z"
 }

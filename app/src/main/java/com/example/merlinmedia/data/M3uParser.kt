@@ -117,9 +117,18 @@ object M3uParser {
                 val isHtmlPage = lowerLine.endsWith(".html") || lowerLine.endsWith(".htm")
 
                 if (!isDeadOrBlocked && !isNonDirectStream && !isHtmlPage) {
+                    val parsedQuality = when {
+                        lowerTitle.contains("4k") || lowerTitle.contains("uhd") || lowerTitle.contains("2160p") -> "4K"
+                        lowerTitle.contains("1080p") || lowerTitle.contains("1080") || lowerTitle.contains("fhd") -> "1080p"
+                        lowerTitle.contains("720p") || lowerTitle.contains("720") || lowerTitle.contains("hd") -> "720p"
+                        lowerTitle.contains("576p") || lowerTitle.contains("480p") || lowerTitle.contains("sd") -> "SD"
+                        else -> "1080p"
+                    }
+
                     // Clean title: remove any leftover bracket artifacts
                     val cleanTitle = currentTitle
                         .replace(Regex("""\[.*?\]"""), "")
+                        .replace(Regex("""\(.*?\)"""), "")
                         .replace(Regex("""\s+"""), " ")
                         .trim()
                         .ifBlank { "Channel ${entries.size + 1}" }
@@ -135,7 +144,8 @@ object M3uParser {
                             country = currentCountry,
                             group = currentGroup.ifBlank { "General" },
                             logo = currentLogo,
-                            source = sourceLabel
+                            source = sourceLabel,
+                            quality = parsedQuality
                         )
                     )
                 }

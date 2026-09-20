@@ -17,7 +17,8 @@ data class MediaEntry(
     val season: Int? = null,
     val episode: Int? = null,
     val backdrop: String? = null,
-    val isVod: Boolean = false
+    val isVod: Boolean = false,
+    val quality: String = "1080p"
 )
 
 enum class Kind {

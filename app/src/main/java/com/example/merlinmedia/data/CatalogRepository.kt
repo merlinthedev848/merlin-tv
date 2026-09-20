@@ -113,6 +113,25 @@ object CatalogRepository {
         }.getOrDefault("")
     }
 
+    fun detectQuality(raw: String, defaultQuality: String = "1080p"): String {
+        val lower = raw.lowercase()
+        return when {
+            lower.contains("4k") || lower.contains("uhd") || lower.contains("2160p") -> "4K"
+            lower.contains("1080p") || lower.contains("1080") || lower.contains("fhd") -> "1080p"
+            lower.contains("720p") || lower.contains("720") || lower.contains("hd") -> "720p"
+            lower.contains("576p") || lower.contains("480p") || lower.contains("sd") -> "SD"
+            else -> defaultQuality
+        }
+    }
+
+    fun sanitizeChannelTitle(raw: String): String {
+        return raw
+            .replace(Regex("""\[.*?\]"""), "")
+            .replace(Regex("""\(.*?\)"""), "")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
+    }
+
     // ==========================================
     // DISK CACHING MECHANISM FOR INSTANT OFFLINE
     // ==========================================
@@ -145,6 +164,7 @@ object CatalogRepository {
                     if (entry.episode != null) put("episode", entry.episode)
                     put("backdrop", entry.backdrop ?: "")
                     put("isVod", entry.isVod)
+                    put("quality", entry.quality)
                 }
                 jsonArray.put(obj)
             }
@@ -180,7 +200,8 @@ object CatalogRepository {
                         season = if (obj.has("season")) obj.optInt("season") else null,
                         episode = if (obj.has("episode")) obj.optInt("episode") else null,
                         backdrop = obj.optString("backdrop").ifBlank { null },
-                        isVod = obj.optBoolean("isVod", false)
+                        isVod = obj.optBoolean("isVod", false),
+                        quality = obj.optString("quality", "1080p")
                     )
                 )
             }
@@ -287,36 +308,24 @@ object CatalogRepository {
                 }
             } ?: emptyList()
 
+            fun processAndAdd(entry: MediaEntry) {
+                val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, entry.quality.ifBlank { "1080p" })
+                val clean = sanitizeChannelTitle(entry.title)
+                if (clean.isNotBlank()) {
+                    allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false, quality = qual))
+                }
+            }
+
             countryTasks.forEach { task ->
                 val channels = task.await()
-                channels.forEach { entry ->
-                    val clean = sanitizeChannelTitle(entry.title)
-                    if (clean.isNotBlank()) {
-                        allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false))
-                    }
-                }
+                channels.forEach { processAndAdd(it) }
             }
-            sportsTask.await().forEach { entry ->
-                val clean = sanitizeChannelTitle(entry.title)
-                if (clean.isNotBlank()) allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false))
-            }
-            newsTask.await().forEach { entry ->
-                val clean = sanitizeChannelTitle(entry.title)
-                if (clean.isNotBlank()) allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false))
-            }
-            autoTask.await().forEach { entry ->
-                val clean = sanitizeChannelTitle(entry.title)
-                if (clean.isNotBlank()) allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false))
-            }
-            freeTvTask.await().forEach { entry ->
-                val clean = sanitizeChannelTitle(entry.title)
-                if (clean.isNotBlank()) allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false))
-            }
+            sportsTask.await().forEach { processAndAdd(it) }
+            newsTask.await().forEach { processAndAdd(it) }
+            autoTask.await().forEach { processAndAdd(it) }
+            freeTvTask.await().forEach { processAndAdd(it) }
             customTasks.forEach { task ->
-                task.await().forEach { entry ->
-                    val clean = sanitizeChannelTitle(entry.title)
-                    if (clean.isNotBlank()) allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false))
-                }
+                task.await().forEach { processAndAdd(it) }
             }
         }
 
@@ -355,7 +364,8 @@ object CatalogRepository {
                     val parsed = M3uParser.parse(body, defaultCountry = "UK", defaultKind = Kind.PLUTO, sourceLabel = "Pluto TV UK")
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
-                        entry.copy(type = Kind.PLUTO, country = "UK", group = grp)
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "720p")
+                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, country = "UK", group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -366,7 +376,8 @@ object CatalogRepository {
                     val parsed = M3uParser.parse(body, defaultCountry = "USA", defaultKind = Kind.PLUTO, sourceLabel = "Pluto TV USA")
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
-                        entry.copy(type = Kind.PLUTO, country = "USA", group = grp)
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "720p")
+                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, country = "USA", group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -399,21 +410,12 @@ object CatalogRepository {
             }
         }
 
-        val skyList = curatedSkyChannels.map { it.copy(type = Kind.SKY) }
+        val skyList = curatedSkyChannels.map { it.copy(type = Kind.SKY, quality = it.quality.ifBlank { "1080p" }) }
         cachedSkyChannels = skyList
         if (context != null) {
             saveToDiskCache(context, "sky", skyList)
         }
         skyList
-    }
-
-    fun sanitizeChannelTitle(raw: String): String {
-        return raw
-            .replace(Regex("\\[.*?\\]"), "")
-            .replace(Regex("\\(.*?p\\)", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\(.*?fps\\)", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\s+"), " ")
-            .trim()
     }
 
     /**
