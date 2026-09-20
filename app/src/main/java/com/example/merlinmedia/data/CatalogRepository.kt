@@ -12,6 +12,14 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 
+data class AllCatalogsResult(
+    val live: List<MediaEntry>,
+    val pluto: List<MediaEntry>,
+    val sky: List<MediaEntry>,
+    val movies: List<MediaEntry>,
+    val series: List<MediaEntry>
+)
+
 object CatalogRepository {
 
     val availableCountries = listOf(
@@ -26,6 +34,8 @@ object CatalogRepository {
     )
 
     private const val FREE_TV_PLAYLIST = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
+    private const val PLUTO_GB_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_gb.m3u"
+    private const val PLUTO_US_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/pluto/main/pluto_us.m3u"
     private const val MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/movies.m3u"
     private const val CLASSIC_MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/classic.m3u"
     private const val SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/series.m3u"
@@ -34,6 +44,12 @@ object CatalogRepository {
 
     @Volatile
     private var cachedLiveChannels: List<MediaEntry> = emptyList()
+
+    @Volatile
+    private var cachedPlutoChannels: List<MediaEntry> = emptyList()
+
+    @Volatile
+    private var cachedSkyChannels: List<MediaEntry> = emptyList()
 
     @Volatile
     private var cachedMovieChannels: List<MediaEntry> = emptyList()
@@ -135,7 +151,6 @@ object CatalogRepository {
             return@withContext cachedLiveChannels
         }
 
-        // Fast disk cache fallback on initial start
         if (!forceRefresh && context != null) {
             val diskItems = loadFromDiskCache(context, "live")
             if (diskItems.isNotEmpty()) {
@@ -145,12 +160,10 @@ object CatalogRepository {
         }
 
         val allEntries = mutableListOf<MediaEntry>()
-        // Always include curated verified channels first for guaranteed immediate playback
         allEntries.addAll(curatedLiveChannels)
 
         val activeCountries = context?.let { getSelectedCountryCodes(it) } ?: availableCountries.map { it.first }.toSet()
 
-        // 1. Fetch active country playlists in parallel
         coroutineScope {
             val countryTasks = availableCountries
                 .filter { activeCountries.contains(it.first) }
@@ -174,7 +187,6 @@ object CatalogRepository {
                     }
                 }
 
-            // 2. Fetch curated Free-TV global playlist
             val freeTvTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, FREE_TV_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -184,7 +196,6 @@ object CatalogRepository {
                 }
             }
 
-            // 3. Fetch custom playlists if configured
             val customTasks = context?.let { ctx ->
                 getCustomPlaylists(ctx).map { (name, url) ->
                     async(Dispatchers.IO) {
@@ -198,7 +209,6 @@ object CatalogRepository {
                 }
             } ?: emptyList()
 
-            // Collect all results
             countryTasks.forEach { allEntries.addAll(it.await()) }
             allEntries.addAll(freeTvTask.await())
             customTasks.forEach { allEntries.addAll(it.await()) }
@@ -210,6 +220,83 @@ object CatalogRepository {
             saveToDiskCache(context, "live", distinctList)
         }
         distinctList
+    }
+
+    /**
+     * Load dedicated Pluto TV channels (UK + US Feeds categorized into Movies, Crime, Drama, Comedy, Sports, etc.)
+     */
+    suspend fun loadPluto(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
+        if (cachedPlutoChannels.isNotEmpty() && !forceRefresh) {
+            return@withContext cachedPlutoChannels
+        }
+
+        if (!forceRefresh && context != null) {
+            val diskItems = loadFromDiskCache(context, "pluto")
+            if (diskItems.isNotEmpty()) {
+                cachedPlutoChannels = diskItems
+                return@withContext diskItems
+            }
+        }
+
+        val allEntries = mutableListOf<MediaEntry>()
+
+        coroutineScope {
+            val plutoGbTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, PLUTO_GB_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "UK", defaultKind = Kind.PLUTO, sourceLabel = "Pluto TV UK")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
+                        entry.copy(type = Kind.PLUTO, country = "UK", group = grp)
+                    }
+                } else emptyList()
+            }
+
+            val plutoUsTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, PLUTO_US_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "USA", defaultKind = Kind.PLUTO, sourceLabel = "Pluto TV USA")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
+                        entry.copy(type = Kind.PLUTO, country = "USA", group = grp)
+                    }
+                } else emptyList()
+            }
+
+            allEntries.addAll(plutoGbTask.await())
+            allEntries.addAll(plutoUsTask.await())
+        }
+
+        val distinctList = allEntries.distinctBy { it.url }
+        cachedPlutoChannels = distinctList
+        if (context != null) {
+            saveToDiskCache(context, "pluto", distinctList)
+        }
+        distinctList
+    }
+
+    /**
+     * Load dedicated Sky & British Premier News & Entertainment Network
+     */
+    suspend fun loadSky(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
+        if (cachedSkyChannels.isNotEmpty() && !forceRefresh) {
+            return@withContext cachedSkyChannels
+        }
+
+        if (!forceRefresh && context != null) {
+            val diskItems = loadFromDiskCache(context, "sky")
+            if (diskItems.isNotEmpty()) {
+                cachedSkyChannels = diskItems
+                return@withContext diskItems
+            }
+        }
+
+        val skyList = curatedSkyChannels.map { it.copy(type = Kind.SKY) }
+        cachedSkyChannels = skyList
+        if (context != null) {
+            saveToDiskCache(context, "sky", skyList)
+        }
+        skyList
     }
 
     /**
@@ -311,14 +398,22 @@ object CatalogRepository {
     }
 
     /**
-     * Parallel loader for all three catalogs simultaneously.
+     * Parallel loader for all catalogs simultaneously.
      */
-    suspend fun loadAllCatalogs(context: Context? = null, forceRefresh: Boolean = false): Triple<List<MediaEntry>, List<MediaEntry>, List<MediaEntry>> = coroutineScope {
+    suspend fun loadAllCatalogs(context: Context? = null, forceRefresh: Boolean = false): AllCatalogsResult = coroutineScope {
         val liveDeferred = async(Dispatchers.IO) { loadLive(context, forceRefresh) }
+        val plutoDeferred = async(Dispatchers.IO) { loadPluto(context, forceRefresh) }
+        val skyDeferred = async(Dispatchers.IO) { loadSky(context, forceRefresh) }
         val moviesDeferred = async(Dispatchers.IO) { loadMovies(context, forceRefresh) }
         val seriesDeferred = async(Dispatchers.IO) { loadSeries(context, forceRefresh) }
 
-        Triple(liveDeferred.await(), moviesDeferred.await(), seriesDeferred.await())
+        AllCatalogsResult(
+            live = liveDeferred.await(),
+            pluto = plutoDeferred.await(),
+            sky = skyDeferred.await(),
+            movies = moviesDeferred.await(),
+            series = seriesDeferred.await()
+        )
     }
 
     fun getCategories(entries: List<MediaEntry>): List<String> {
@@ -351,7 +446,7 @@ object CatalogRepository {
             .edit()
             .putString("custom_urls", encoded)
             .apply()
-        cachedLiveChannels = emptyList() // invalidate cache
+        cachedLiveChannels = emptyList()
     }
 
     fun removeCustomPlaylist(context: Context, url: String) {
@@ -361,10 +456,9 @@ object CatalogRepository {
             .edit()
             .putString("custom_urls", encoded)
             .apply()
-        cachedLiveChannels = emptyList() // invalidate cache
+        cachedLiveChannels = emptyList()
     }
 
-    // High uptime, verified working UK & International Live Streams with complete metadata
     val curatedLiveChannels: List<MediaEntry> = listOf(
         MediaEntry(
             id = "uk-bbc-news-fhd",
@@ -508,6 +602,97 @@ object CatalogRepository {
             logo = "https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/WeatherNation_logo.svg/320px-WeatherNation_logo.svg.png",
             description = "Continuous live weather radar, forecasts and severe weather storm coverage.",
             source = "WeatherNation"
+        )
+    )
+
+    val curatedSkyChannels: List<MediaEntry> = listOf(
+        MediaEntry(
+            id = "sky-news-uk-fhd",
+            title = "Sky News UK (1080p FHD)",
+            url = "https://skynews-live.akamaized.net/hls/live/2026859/skynews_hd/master.m3u8",
+            type = Kind.SKY,
+            group = "Sky | NEWS",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/en/thumb/9/90/Sky_News_logo_2020.svg/320px-Sky_News_logo_2020.svg.png",
+            description = "Live breaking news, UK national stories, political reports, and global headlines.",
+            source = "Sky Network"
+        ),
+        MediaEntry(
+            id = "sky-bbc-news-fhd",
+            title = "BBC News UK (1080p FHD)",
+            url = "https://vs-hls-push-uk-live.akamaized.net/x=4/i=urn:bbc:pips:service:bbc_news_channel_hd/t=3840/v=pv14/b=5070016/main.m3u8",
+            type = Kind.SKY,
+            group = "Sky | NEWS",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/BBC_News_2022.svg/320px-BBC_News_2022.svg.png",
+            description = "24-hour BBC News broadcast live in Full HD.",
+            source = "BBC Network"
+        ),
+        MediaEntry(
+            id = "sky-bloomberg-europe",
+            title = "Bloomberg Europe (1080p FHD)",
+            url = "https://liveproduseast.global.ssl.fastly.net/us/Channel-HD-AWS-virginia-1/live.m3u8",
+            type = Kind.SKY,
+            group = "Sky | BUSINESS",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Bloomberg_Television_logo.svg/320px-Bloomberg_Television_logo.svg.png",
+            description = "European markets, financial analytics, stock trends, and economic reports.",
+            source = "Bloomberg Network"
+        ),
+        MediaEntry(
+            id = "sky-euronews-world",
+            title = "Euronews English (1080p FHD)",
+            url = "https://euronews-euronews-world-1-gb.samsung.wurl.tv/playlist.m3u8",
+            type = Kind.SKY,
+            group = "Sky | NEWS",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Euronews_2016_logo.svg/320px-Euronews_2016_logo.svg.png",
+            description = "International news and European stories delivered 24/7.",
+            source = "Euronews"
+        ),
+        MediaEntry(
+            id = "sky-france24-english",
+            title = "France 24 English (1080p FHD)",
+            url = "https://f24hls-i.akamaihd.net/hls/live/221193/F24_EN_LO_HLS/master_2000.m3u8",
+            type = Kind.SKY,
+            group = "Sky | NEWS",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/France_24_logo.svg/320px-France_24_logo.svg.png",
+            description = "International perspectives and breaking world headlines.",
+            source = "France 24"
+        ),
+        MediaEntry(
+            id = "sky-dw-english",
+            title = "DW English Live (1080p FHD)",
+            url = "https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/index.m3u8",
+            type = Kind.SKY,
+            group = "Sky | DOCUMENTARY",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Deutsche_Welle_logo.svg/320px-Deutsche_Welle_logo.svg.png",
+            description = "Deutsche Welle documentary features, science, and world analysis.",
+            source = "Deutsche Welle"
+        ),
+        MediaEntry(
+            id = "sky-reuters-tv",
+            title = "Reuters TV Live (1080p FHD)",
+            url = "https://reuters-reutersnow-1-us.rakuten.wurl.tv/playlist.m3u8",
+            type = Kind.SKY,
+            group = "Sky | NEWS",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Reuters_Logo.svg/320px-Reuters_Logo.svg.png",
+            description = "Direct news feeds from journalists around the globe.",
+            source = "Thomson Reuters"
+        ),
+        MediaEntry(
+            id = "sky-redbull-tv",
+            title = "Red Bull TV Live (1080p FHD)",
+            url = "https://rbmn-live.akamaized.net/hls/live/590964/BoRB-AT/master.m3u8",
+            type = Kind.SKY,
+            group = "Sky | SPORTS",
+            country = "UK",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Red_Bull_TV_logo.svg/320px-Red_Bull_TV_logo.svg.png",
+            description = "Extreme sports, world championships, motorsports, and music festivals.",
+            source = "Red Bull"
         )
     )
 }

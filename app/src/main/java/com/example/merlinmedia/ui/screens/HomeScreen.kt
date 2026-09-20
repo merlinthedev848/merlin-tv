@@ -36,6 +36,8 @@ import com.example.merlinmedia.ui.theme.*
 @Composable
 fun HomeScreen(
     liveChannels: List<MediaEntry>,
+    plutoChannels: List<MediaEntry>,
+    skyChannels: List<MediaEntry>,
     movieChannels: List<MediaEntry>,
     seriesChannels: List<MediaEntry>,
     isLoading: Boolean,
@@ -91,14 +93,16 @@ fun HomeScreen(
     }
 
     // Precise Filter Logic (Matches Sidebar numbers 100% identically)
-    val currentItems = remember(selectedTab, selectedFilter, searchQuery, liveChannels, movieChannels, seriesChannels, favoriteIds.value) {
+    val currentItems = remember(selectedTab, selectedFilter, searchQuery, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds.value) {
         val baseList = when (selectedTab) {
             Kind.LIVE -> liveChannels
+            Kind.PLUTO -> plutoChannels
+            Kind.SKY -> skyChannels
             Kind.MOVIE -> movieChannels
             Kind.SERIES -> seriesChannels
             Kind.FAVORITES -> {
                 val favSet = favoriteIds.value
-                val allKnown = liveChannels + movieChannels + seriesChannels
+                val allKnown = liveChannels + plutoChannels + skyChannels + movieChannels + seriesChannels
                 allKnown.filter { favSet.contains(it.id) }
             }
         }
@@ -204,6 +208,26 @@ fun HomeScreen(
                 isSelected = selectedTab == Kind.LIVE && selectedFilter == "All",
                 onClick = {
                     selectedTab = Kind.LIVE
+                    selectedFilter = "All"
+                }
+            )
+
+            NavRailItem(
+                icon = Icons.Default.Language,
+                label = "Pluto TV (${plutoChannels.size})",
+                isSelected = selectedTab == Kind.PLUTO && selectedFilter == "All",
+                onClick = {
+                    selectedTab = Kind.PLUTO
+                    selectedFilter = "All"
+                }
+            )
+
+            NavRailItem(
+                icon = Icons.Default.Sensors,
+                label = "Sky & News (${skyChannels.size})",
+                isSelected = selectedTab == Kind.SKY && selectedFilter == "All",
+                onClick = {
+                    selectedTab = Kind.SKY
                     selectedFilter = "All"
                 }
             )
@@ -381,6 +405,8 @@ fun HomeScreen(
                     } else {
                         when (selectedTab) {
                             Kind.LIVE -> "All Live TV · ${currentItems.size}"
+                            Kind.PLUTO -> "Pluto TV Channels · ${currentItems.size}"
+                            Kind.SKY -> "Sky & News Network · ${currentItems.size}"
                             Kind.MOVIE -> "All Movies · ${currentItems.size}"
                             Kind.SERIES -> "All Series · ${currentItems.size}"
                             Kind.FAVORITES -> "Favorites · ${currentItems.size}"

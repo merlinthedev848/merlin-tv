@@ -14,6 +14,8 @@ data class MediaEntry(
 
 enum class Kind {
     LIVE,
+    PLUTO,
+    SKY,
     MOVIE,
     SERIES,
     FAVORITES

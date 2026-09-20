@@ -59,6 +59,8 @@ fun MerlinTvApp(
     val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
 
     var liveChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
+    var plutoChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
+    var skyChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
     var movieChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
     var seriesChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -72,8 +74,10 @@ fun MerlinTvApp(
     fun loadChannels(forceRefresh: Boolean = false) {
         isLoading = true
         coroutineScope.launch {
-            val (live, movies, series) = CatalogRepository.loadAllCatalogs(context, forceRefresh = forceRefresh)
+            val (live, pluto, sky, movies, series) = CatalogRepository.loadAllCatalogs(context, forceRefresh = forceRefresh)
             liveChannels = live
+            plutoChannels = pluto
+            skyChannels = sky
             movieChannels = movies
             seriesChannels = series
             isLoading = false
@@ -113,7 +117,7 @@ fun MerlinTvApp(
         )
     } else {
         // Show wizard splash only on cold start (channels not yet loaded)
-        val showSplash = isLoading && liveChannels.isEmpty() && movieChannels.isEmpty()
+        val showSplash = isLoading && liveChannels.isEmpty() && plutoChannels.isEmpty() && skyChannels.isEmpty() && movieChannels.isEmpty()
         AnimatedContent(
             targetState = showSplash,
             transitionSpec = {
@@ -128,6 +132,8 @@ fun MerlinTvApp(
             } else {
                 HomeScreen(
                     liveChannels = liveChannels,
+                    plutoChannels = plutoChannels,
+                    skyChannels = skyChannels,
                     movieChannels = movieChannels,
                     seriesChannels = seriesChannels,
                     isLoading = isLoading,
