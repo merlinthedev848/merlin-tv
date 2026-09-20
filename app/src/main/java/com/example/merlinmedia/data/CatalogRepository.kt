@@ -216,6 +216,39 @@ object CatalogRepository {
                     }
                 }
 
+            val sportsTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, SPORTS_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Sports", defaultKind = Kind.LIVE, sourceLabel = "iptv-org Sports")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Sports | ${entry.group.trim().uppercase()}" else "Sports | LIVE ACTION"
+                        entry.copy(group = grp, country = entry.country.ifBlank { "Sports" })
+                    }
+                } else emptyList()
+            }
+
+            val newsTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, NEWS_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "News", defaultKind = Kind.LIVE, sourceLabel = "iptv-org News")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "News | ${entry.group.trim().uppercase()}" else "News | LIVE NEWS"
+                        entry.copy(group = grp, country = entry.country.ifBlank { "News" })
+                    }
+                } else emptyList()
+            }
+
+            val autoTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, AUTO_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Auto", defaultKind = Kind.LIVE, sourceLabel = "iptv-org Auto")
+                    parsed.map { entry ->
+                        val grp = if (entry.group.isNotBlank()) "Auto | ${entry.group.trim().uppercase()}" else "Auto | MOTORSPORTS"
+                        entry.copy(group = grp, country = entry.country.ifBlank { "Auto" })
+                    }
+                } else emptyList()
+            }
+
             val freeTvTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, FREE_TV_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -239,6 +272,9 @@ object CatalogRepository {
             } ?: emptyList()
 
             countryTasks.forEach { allEntries.addAll(it.await()) }
+            allEntries.addAll(sportsTask.await())
+            allEntries.addAll(newsTask.await())
+            allEntries.addAll(autoTask.await())
             allEntries.addAll(freeTvTask.await())
             customTasks.forEach { allEntries.addAll(it.await()) }
         }
