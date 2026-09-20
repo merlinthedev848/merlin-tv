@@ -45,8 +45,7 @@ import com.example.merlinmedia.model.AspectRatioMode
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.player.ExoPlayerHelper
-import com.example.merlinmedia.ui.components.ChannelGridCard
-import com.example.merlinmedia.ui.components.TvSearchBar
+import com.example.merlinmedia.ui.components.*
 import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -615,44 +614,58 @@ fun PlayerScreen(
             }
         }
 
-        // Solid, Opaque Mini Channel Guide Drawer
+        // Cobra / TiviMate Style Semi-Transparent Glass Channel Guide Drawer
         AnimatedVisibility(
             visible = showMiniGuide,
-            enter = slideInHorizontally(initialOffsetX = { -it }),
-            exit = slideOutHorizontally(targetOffsetX = { -it })
+            enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(animationSpec = tween(200)),
+            exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(animationSpec = tween(200))
         ) {
             Box(
                 modifier = Modifier
                     .fillMaxHeight()
-                    .width(360.dp)
-                    .background(SolidBarBg)
-                    .border(1.dp, BorderSubtle)
+                    .width(380.dp)
+                    .background(GlassSurfaceDark)
+                    .border(1.dp, GlassBorder)
                     .padding(16.dp)
             ) {
                 Column(
                     modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Channel Guide",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = AccentSky
-                        )
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(PrimaryBlue),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(Icons.Default.LiveTv, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                            Text(
+                                text = "Quick Channel Guide",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
                         IconButton(onClick = { showMiniGuide = false }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = TextPrimary)
+                            Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
                         }
                     }
 
                     TvSearchBar(
                         query = miniGuideSearch,
                         onQueryChange = { miniGuideSearch = it },
-                        placeholderText = "Quick find channel..."
+                        placeholderText = "Filter ${playlist.size} channels..."
                     )
 
                     val filteredMiniList = remember(miniGuideSearch, playlist) {
@@ -660,26 +673,25 @@ fun PlayerScreen(
                         else {
                             val q = miniGuideSearch.trim().lowercase()
                             playlist.filter {
-                                it.title.lowercase().contains(q) || it.group.lowercase().contains(q)
+                                it.title.lowercase().contains(q) || it.group.lowercase().contains(q) || it.country.lowercase().contains(q)
                             }
                         }
                     }
 
                     LazyColumn(
                         modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         itemsIndexed(filteredMiniList, key = { index, it -> "${it.id}-${it.url}-$index" }) { index, item ->
-                            ChannelGridCard(
+                            QuickChannelDrawerItem(
                                 item = item,
                                 channelNumber = 101 + index,
+                                isCurrentPlaying = item.id == currentItem.id || item.url == currentItem.url,
                                 isFavorite = favoritesManager.isFavorite(item.id),
                                 onToggleFavorite = {
                                     val newState = favoritesManager.toggleFavorite(item.id)
-                                    // Fix #16: sync OSD header star if we toggled the current item
                                     if (item.id == currentItem.id) isFavorite = newState
                                 },
-                                onFocusChange = {},
                                 onClick = {
                                     playItem(item)
                                     showMiniGuide = false

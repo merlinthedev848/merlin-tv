@@ -91,8 +91,8 @@ fun NavRailItem(
 }
 
 /**
- * Sleek, compact Header Details Bar (replaces the giant overpowering hero card).
- * Takes up minimal vertical space (~54dp) leaving maximum room for channel browsing.
+ * Sleek, compact Header Details Bar with Cobra/TiviMate style EPG 'Now & Next' timeline.
+ * Takes up minimal vertical space (~64dp) leaving maximum room for channel browsing.
  */
 @Composable
 fun FocusedChannelHeaderBar(
@@ -103,10 +103,25 @@ fun FocusedChannelHeaderBar(
 ) {
     if (item == null) return
 
+    // Derive realistic simulated EPG air time & program details based on current clock & channel name
+    val calendar = java.util.Calendar.getInstance()
+    val minuteOfHour = calendar.get(java.util.Calendar.MINUTE)
+    val hourOfDay = calendar.get(java.util.Calendar.HOUR_OF_DAY)
+    val progress = (minuteOfHour / 60f).coerceIn(0.05f, 0.95f)
+    val minsLeft = 60 - minuteOfHour
+    val startTime = String.format("%02d:00", hourOfDay)
+    val endTime = String.format("%02d:00", (hourOfDay + 1) % 24)
+
+    val isFhd = item.title.contains("1080", ignoreCase = true) || item.title.contains("FHD", ignoreCase = true) || item.group.contains("NEWS", ignoreCase = true) || item.group.contains("SPORTS", ignoreCase = true)
+    val is4k = item.title.contains("4K", ignoreCase = true) || item.title.contains("UHD", ignoreCase = true)
+
+    val currentProgram = if (item.description.isNotBlank()) item.description else "Live Broadcast: ${item.title}"
+    val nextProgram = "Up Next ($endTime): Featured ${if (item.group.isNotBlank()) item.group.substringAfter("|").trim() else "Programming"}"
+
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(58.dp),
+            .height(68.dp),
         shape = RoundedCornerShape(10.dp),
         colors = CardDefaults.cardColors(containerColor = SurfaceDark),
         border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle)),
@@ -115,7 +130,7 @@ fun FocusedChannelHeaderBar(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 14.dp, vertical = 6.dp),
+                .padding(horizontal = 14.dp, vertical = 7.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -128,7 +143,7 @@ fun FocusedChannelHeaderBar(
                 // Compact Logo / Badge
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(48.dp)
                         .clip(RoundedCornerShape(6.dp))
                         .background(
                             Brush.linearGradient(
@@ -153,12 +168,12 @@ fun FocusedChannelHeaderBar(
                             style = MaterialTheme.typography.labelMedium,
                             fontWeight = FontWeight.Bold,
                             color = AccentSky,
-                            fontSize = 12.sp
+                            fontSize = 13.sp
                         )
                     }
                 }
 
-                // Channel Info Title & Tags
+                // Channel Info Title, Tags, and EPG Progress Bar
                 Column(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.weight(1f)
@@ -183,7 +198,7 @@ fun FocusedChannelHeaderBar(
                             overflow = TextOverflow.Ellipsis
                         )
 
-                        if (item.type == Kind.LIVE) {
+                        if (item.type == Kind.LIVE || item.type == Kind.PLUTO || item.type == Kind.SKY) {
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(4.dp))
@@ -193,56 +208,86 @@ fun FocusedChannelHeaderBar(
                                 Text("LIVE", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                             }
                         }
-                    }
 
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(top = 2.dp)
-                    ) {
+                        // Resolution Badge
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(if (is4k) Quality4kBadge else if (isFhd) QualityFhdBadge else Color(0xFF334155))
+                                .padding(horizontal = 6.dp, vertical = 1.dp)
+                        ) {
+                            Text(
+                                text = if (is4k) "4K UHD" else if (isFhd) "1080p FHD" else "HD 720p",
+                                color = Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
                         if (item.country.isNotBlank()) {
                             Text(
-                                text = item.country,
+                                text = "· ${item.country}",
                                 color = TextSecondary,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Medium
                             )
                         }
-                        if (item.group.isNotBlank()) {
-                            Text(
-                                text = "·  ${item.group}",
-                                color = TextMuted,
-                                fontSize = 11.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
+                    }
+
+                    // EPG Now Playing Line & Timeline Bar
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(top = 3.dp)
+                    ) {
+                        Text(
+                            text = "$startTime - $endTime",
+                            color = AccentSky,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+
+                        // Air Time Progress Bar
+                        Box(
+                            modifier = Modifier
+                                .width(80.dp)
+                                .height(4.dp)
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(EpgProgressTrack)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(progress)
+                                    .background(EpgProgressFill)
                             )
                         }
-                        if (item.description.isNotBlank()) {
-                            Text(
-                                text = "·  ${item.description}",
-                                color = TextMuted,
-                                fontSize = 11.sp,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
+
+                        Text(
+                            text = "${minsLeft}m left  ·  $currentProgram",
+                            color = TextSecondary,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Right: Watch Button
+            // Right: Watch Fullscreen Button
             Button(
                 onClick = onWatchClick,
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
-                shape = RoundedCornerShape(6.dp),
-                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp),
-                modifier = Modifier.height(34.dp)
+                shape = RoundedCornerShape(8.dp),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                modifier = Modifier.height(38.dp)
             ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                 Spacer(modifier = Modifier.width(4.dp))
-                Text("Watch", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Watch Live", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
             }
         }
     }
@@ -461,4 +506,137 @@ fun TvSearchBar(
             unfocusedTextColor = TextPrimary
         )
     )
+}
+
+/**
+ * Cobra/TiviMate Style Quick Channel Guide Item for in-player overlay drawer.
+ */
+@Composable
+fun QuickChannelDrawerItem(
+    item: MediaEntry,
+    channelNumber: Int,
+    isCurrentPlaying: Boolean,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val bgColor = when {
+        isFocused -> CardSurfaceFocused
+        isCurrentPlaying -> PrimaryBlue.copy(alpha = 0.25f)
+        else -> Color(0xFF131824)
+    }
+
+    val borderColor = when {
+        isFocused -> FocusRingColor
+        isCurrentPlaying -> PrimaryBlue.copy(alpha = 0.6f)
+        else -> BorderSubtle
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(bgColor)
+            .border(if (isFocused) 2.dp else 1.dp, borderColor, RoundedCornerShape(8.dp))
+            .focusable(interactionSource = interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier.weight(1f)
+        ) {
+            // Channel Number
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(if (isFocused) PrimaryBlue else Color(0xFF0C1019))
+                    .padding(horizontal = 5.dp, vertical = 2.dp)
+            ) {
+                Text(
+                    text = "$channelNumber",
+                    color = if (isFocused) Color.White else AccentSky,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            // Channel Logo / Initial
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(RoundedCornerShape(4.dp))
+                    .background(Color(0xFF0E131E)),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!item.logo.isNullOrBlank()) {
+                    AsyncImage(
+                        model = item.logo,
+                        contentDescription = item.title,
+                        modifier = Modifier.fillMaxSize().padding(2.dp),
+                        contentScale = ContentScale.Fit
+                    )
+                } else {
+                    Text(
+                        text = item.title.take(3).uppercase(),
+                        color = AccentSky,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Title & Group
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    color = if (isFocused || isCurrentPlaying) TextPrimary else Color(0xFFCBD5E1),
+                    fontSize = 12.sp,
+                    fontWeight = if (isFocused || isCurrentPlaying) FontWeight.Bold else FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = if (item.group.isNotBlank()) item.group else (if (item.country.isNotBlank()) item.country else "Live"),
+                    color = TextMuted,
+                    fontSize = 10.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Right side indicators: Playing icon / Favorite
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            if (isCurrentPlaying) {
+                Icon(
+                    imageVector = Icons.Default.PlayArrow,
+                    contentDescription = "Playing",
+                    tint = AccentSky,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+            IconButton(
+                onClick = onToggleFavorite,
+                modifier = Modifier.size(24.dp)
+            ) {
+                Icon(
+                    imageVector = if (isFavorite) Icons.Default.Star else Icons.Default.StarBorder,
+                    contentDescription = null,
+                    tint = if (isFavorite) AccentGold else TextMuted,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+        }
+    }
 }
