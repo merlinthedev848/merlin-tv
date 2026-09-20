@@ -10,7 +10,12 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -28,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
@@ -848,6 +854,421 @@ fun QuickChannelDrawerItem(
                     tint = if (isFavorite) AccentGold else TextMuted,
                     modifier = Modifier.size(14.dp)
                 )
+            }
+        }
+    }
+}
+
+/**
+ * 2:3 Vertical Poster Card for VOD Movies & Series (Netflix / Prime Video Style)
+ */
+@Composable
+fun VodMovieCard(
+    item: MediaEntry,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.06f else 1.0f,
+        animationSpec = tween(120),
+        label = "vodScale"
+    )
+
+    Column(
+        modifier = modifier
+            .scale(scale)
+            .width(150.dp)
+            .focusable(interactionSource = interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        // Poster Box (2:3 Aspect Ratio)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(220.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(SurfaceDark)
+                .border(
+                    width = if (isFocused) 2.5.dp else 1.dp,
+                    color = if (isFocused) AccentSky else BorderSubtle,
+                    shape = RoundedCornerShape(10.dp)
+                )
+        ) {
+            if (!item.logo.isNullOrBlank()) {
+                AsyncImage(
+                    model = item.logo,
+                    contentDescription = item.title,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Brush.verticalGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A)))),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Movie,
+                        contentDescription = null,
+                        tint = AccentSky.copy(alpha = 0.6f),
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+
+            // Top Badges (Year & Rating)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (item.year.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(Color.Black.copy(alpha = 0.75f))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(item.year, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+                if (item.rating.isNotBlank()) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(AccentGold.copy(alpha = 0.9f))
+                            .padding(horizontal = 5.dp, vertical = 2.dp)
+                    ) {
+                        Text(item.rating, color = Color.Black, fontSize = 9.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+            }
+
+            // Bottom Gradient & Duration / Genre Pill
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f))))
+                    .padding(horizontal = 6.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = if (item.duration.isNotBlank()) item.duration else item.genre,
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        // Title below poster
+        Text(
+            text = item.title,
+            color = if (isFocused) Color.White else TextPrimary,
+            fontSize = 12.sp,
+            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/**
+ * Movie VOD Details Modal (Overview, Cast/Genre, Year, Duration, Direct Play)
+ */
+@Composable
+fun VodDetailsDialog(
+    item: MediaEntry,
+    isFavorite: Boolean,
+    onToggleFavorite: () -> Unit,
+    onPlay: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.85f)
+                .border(1.5.dp, AccentSky.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top Backdrop Banner
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp)
+                ) {
+                    AsyncImage(
+                        model = item.backdrop ?: item.logo,
+                        contentDescription = null,
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .background(Brush.verticalGradient(listOf(Color.Transparent, Color(0xFF0F172A))))
+                    )
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(12.dp)
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.6f))
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                }
+
+                // Details Content
+                Row(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // Vertical Poster on left
+                    Box(
+                        modifier = Modifier
+                            .width(130.dp)
+                            .height(190.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(1.dp, BorderSubtle, RoundedCornerShape(10.dp))
+                    ) {
+                        AsyncImage(
+                            model = item.logo,
+                            contentDescription = item.title,
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    }
+
+                    // Metadata & Actions on right
+                    Column(
+                        modifier = Modifier
+                            .weight(1f)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Text(
+                            text = item.title,
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = Color.White
+                        )
+
+                        // Info row: Year, Duration, Rating, Genre
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (item.year.isNotBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(Color(0xFF1E293B))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(item.year, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                            if (item.duration.isNotBlank()) {
+                                Text(item.duration, color = TextSecondary, fontSize = 12.sp)
+                            }
+                            if (item.rating.isNotBlank()) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(AccentGold)
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(item.rating, color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                                }
+                            }
+                            if (item.genre.isNotBlank()) {
+                                Text("•  ${item.genre}", color = AccentSky, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+                        }
+
+                        // Synopsis
+                        Text(
+                            text = if (item.description.isNotBlank()) item.description else "Stream this full feature release in high quality directly on Merlin TV.",
+                            color = Color(0xFFCBD5E1),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+
+                        Spacer(modifier = Modifier.height(6.dp))
+
+                        // Action Buttons: Play Movie & Favorite
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Button(
+                                onClick = onPlay,
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 20.dp, vertical = 10.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Play Movie", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            }
+
+                            OutlinedButton(
+                                onClick = onToggleFavorite,
+                                shape = RoundedCornerShape(8.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, if (isFavorite) AccentGold else BorderSubtle),
+                                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                                    contentDescription = null,
+                                    tint = if (isFavorite) AccentGold else Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(if (isFavorite) "Favorited" else "Favorite", color = Color.White, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Series Episode Picker Modal
+ */
+@Composable
+fun SeriesEpisodeDialog(
+    item: MediaEntry,
+    allEpisodes: List<MediaEntry>,
+    onSelectEpisode: (MediaEntry) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF0F172A)),
+            modifier = Modifier
+                .fillMaxWidth(0.92f)
+                .fillMaxHeight(0.85f)
+                .border(1.5.dp, AccentSky.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                // Header
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(item.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text(if (item.genre.isNotBlank()) item.genre else "Episodic TV Series", color = AccentSky, fontSize = 12.sp)
+                    }
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = "Close", tint = Color.White)
+                    }
+                }
+
+                HorizontalDivider(color = Color(0xFF1E293B))
+
+                Text("Episodes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
+
+                // Episode List
+                LazyColumn(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    itemsIndexed(
+                        items = if (allEpisodes.isNotEmpty()) allEpisodes else listOf(item)
+                    ) { index, ep ->
+                        val epNumber = ep.episode ?: (index + 1)
+                        val epSeason = ep.season ?: 1
+                        val interactionSource = remember { MutableInteractionSource() }
+                        val isFocused by interactionSource.collectIsFocusedAsState()
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isFocused) PrimaryBlue else Color(0xFF1E293B))
+                                .border(1.dp, if (isFocused) AccentSky else BorderSubtle, RoundedCornerShape(8.dp))
+                                .focusable(interactionSource = interactionSource)
+                                .clickable(interactionSource = interactionSource, indication = null) {
+                                    onSelectEpisode(ep)
+                                }
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(Color.Black.copy(alpha = 0.4f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text("E$epNumber", color = AccentSky, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                            }
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Season $epSeason, Episode $epNumber",
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp
+                                )
+                                Text(
+                                    text = ep.description.ifBlank { ep.title },
+                                    color = if (isFocused) Color.White.copy(alpha = 0.85f) else TextSecondary,
+                                    fontSize = 11.sp,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Button(
+                                onClick = { onSelectEpisode(ep) },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (isFocused) Color.White else PrimaryBlue),
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.PlayArrow,
+                                    contentDescription = null,
+                                    tint = if (isFocused) PrimaryBlue else Color.White,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Play", color = if (isFocused) PrimaryBlue else Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
             }
         }
     }

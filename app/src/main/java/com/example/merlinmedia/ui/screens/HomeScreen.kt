@@ -7,9 +7,11 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -72,6 +74,10 @@ fun HomeScreen(
     var focusedItem by remember { mutableStateOf<MediaEntry?>(null) }
     var focusedIndex by remember { mutableIntStateOf(101) }
 
+    // VOD Dialog State
+    var selectedMovieForDetails by remember { mutableStateOf<MediaEntry?>(null) }
+    var selectedSeriesForEpisodes by remember { mutableStateOf<MediaEntry?>(null) }
+
     // Hero Carousel Index
     var heroSlideIndex by remember { mutableIntStateOf(0) }
 
@@ -130,11 +136,21 @@ fun HomeScreen(
         }
     }
 
-    // Dynamic Filter Categories (Full Public FAST & IPTV Taxonomy)
-    val filterCategories = listOf(
-        "All", "News", "Sports", "Movies", "Series", "Entertainment",
-        "Documentary", "Kids", "Animation", "Comedy", "Music", "Cooking",
+    // Dynamic Filter Categories for Live TV
+    val liveFilterCategories = listOf(
+        "All", "News", "Sports", "Entertainment", "Series & Drama",
+        "Documentaries", "Kids", "Animation", "Comedy", "Music", "Cooking",
         "Travel", "Science", "Education", "Business", "Weather", "Classic", "Auto"
+    )
+
+    // Movie Genres
+    val movieFilterGenres = listOf(
+        "All", "Sci-Fi", "Action", "Horror", "Thriller", "Comedy", "Drama", "Fantasy", "Classic", "Animation"
+    )
+
+    // Series Genres
+    val seriesFilterGenres = listOf(
+        "All", "Comedy", "Western", "Animation", "Drama", "Sci-Fi", "Classic"
     )
 
     // Filter Logic based on Active Section
@@ -166,6 +182,7 @@ fun HomeScreen(
             } else {
                 baseList.filter { item ->
                     item.group.contains(selectedFilter, ignoreCase = true) ||
+                    item.genre.contains(selectedFilter, ignoreCase = true) ||
                     item.title.contains(selectedFilter, ignoreCase = true)
                 }
             }
@@ -178,6 +195,7 @@ fun HomeScreen(
             filteredByFilter.filter { item ->
                 item.title.lowercase().contains(q) ||
                 item.group.lowercase().contains(q) ||
+                item.genre.lowercase().contains(q) ||
                 item.country.lowercase().contains(q) ||
                 item.description.lowercase().contains(q)
             }
@@ -195,6 +213,40 @@ fun HomeScreen(
         }
     }
 
+    // Render VOD Movie Details Dialog when selected
+    selectedMovieForDetails?.let { movie ->
+        VodDetailsDialog(
+            item = movie,
+            isFavorite = favoriteIds.value.contains(movie.id),
+            onToggleFavorite = {
+                favoritesManager.toggleFavorite(movie.id)
+                refreshFavorites()
+            },
+            onPlay = {
+                onSelectChannel(movie, movieChannels)
+                selectedMovieForDetails = null
+            },
+            onDismiss = { selectedMovieForDetails = null }
+        )
+    }
+
+    // Render VOD Series Episode Dialog when selected
+    selectedSeriesForEpisodes?.let { series ->
+        val baseTitle = series.title.substringBefore(":").trim()
+        val allEpisodesForSeries = seriesChannels.filter {
+            it.title.startsWith(baseTitle, ignoreCase = true) || it.id.startsWith(series.id.substringBefore("-s1"))
+        }
+        SeriesEpisodeDialog(
+            item = series,
+            allEpisodes = if (allEpisodesForSeries.isNotEmpty()) allEpisodesForSeries else listOf(series),
+            onSelectEpisode = { ep ->
+                onSelectChannel(ep, seriesChannels)
+                selectedSeriesForEpisodes = null
+            },
+            onDismiss = { selectedSeriesForEpisodes = null }
+        )
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -210,7 +262,7 @@ fun HomeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // App Branding (Merlin TV Pro with Snake/Wizard Cyan Badge)
+            // App Branding
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -265,18 +317,6 @@ fun HomeScreen(
                     onClick = { activeSection = NavSection.LIVE; selectedFilter = "All" }
                 )
                 TopNavBarItem(
-                    icon = Icons.Default.Language,
-                    label = "Pluto",
-                    isSelected = activeSection == NavSection.PLUTO,
-                    onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" }
-                )
-                TopNavBarItem(
-                    icon = Icons.Default.Sensors,
-                    label = "Sky",
-                    isSelected = activeSection == NavSection.SKY,
-                    onClick = { activeSection = NavSection.SKY; selectedFilter = "All" }
-                )
-                TopNavBarItem(
                     icon = Icons.Default.PlayCircle,
                     label = "Movies",
                     isSelected = activeSection == NavSection.MOVIES,
@@ -287,6 +327,18 @@ fun HomeScreen(
                     label = "Series",
                     isSelected = activeSection == NavSection.SERIES,
                     onClick = { activeSection = NavSection.SERIES; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.Sensors,
+                    label = "Sky & News",
+                    isSelected = activeSection == NavSection.SKY,
+                    onClick = { activeSection = NavSection.SKY; selectedFilter = "All" }
+                )
+                TopNavBarItem(
+                    icon = Icons.Default.Language,
+                    label = "Pluto TV",
+                    isSelected = activeSection == NavSection.PLUTO,
+                    onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" }
                 )
                 TopNavBarItem(
                     icon = Icons.Default.Radio,
@@ -392,7 +444,7 @@ fun HomeScreen(
         }
 
         // =========================================================
-        // 2. MAIN CONTENT: HOME / HUB HERO VIEW VS. CHANNEL GRID VIEW
+        // 2. MAIN CONTENT VIEW
         // =========================================================
         if (activeSection == NavSection.HOME || activeSection == NavSection.HUB) {
             // Scrollable Home / Hub Dashboard Layout
@@ -404,16 +456,16 @@ fun HomeScreen(
             ) {
                 // Hero Feature Banner Carousel
                 val heroSlides = listOf(
+                    Triple("VOD Movies & Releases", "Feature Films On Demand", "Stream full-length high quality movies, classic cinema & cult favourites with synopsis and ratings.") to { activeSection = NavSection.MOVIES },
+                    Triple("Episodic TV Series", "Binge-Worthy Series On Demand", "Watch complete seasons and episodes of all-time classic TV series with episode guide.") to { activeSection = NavSection.SERIES },
                     Triple("Sky & News Network", "The world, live in 1080p FHD", "Watch live Sky News UK, BBC News, Bloomberg Europe, France 24, DW & breaking global reporting.") to { activeSection = NavSection.SKY },
-                    Triple("Pluto TV FAST Channels", "Binge TV & Unlimited Movies", "Explore hundreds of live FAST feeds across Crime, Drama, Comedy, Documentaries & Classic Hits.") to { activeSection = NavSection.PLUTO },
-                    Triple("Cinema & Feature Films", "Top Movies & Classic Cinema", "Stream curated feature films, classic cinema, action, thriller & sci-fi channels.") to { activeSection = NavSection.MOVIES },
                     Triple("Worldwide Live TV", "1,500+ Live Broadcast Streams", "Instant live TV from the United Kingdom, USA, Canada, Australia, France, Germany & Europe.") to { activeSection = NavSection.LIVE }
                 )
 
                 val (slideInfo, slideAction) = heroSlides[heroSlideIndex]
 
                 HeroFeatureBanner(
-                    tag = "MerlinTV Hub",
+                    tag = "MerlinTV Feature",
                     title = slideInfo.second,
                     subtitle = slideInfo.third,
                     actionLabel = "Explore ${slideInfo.first}",
@@ -437,16 +489,34 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     HubShortcutCard(
-                        title = "Live Cams & World",
-                        subtitle = "Travel & city live streams",
-                        icon = Icons.Default.Videocam,
-                        gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.LIVE; selectedFilter = "Travel" },
+                        title = "Movies (VOD)",
+                        subtitle = "${movieChannels.size} feature films",
+                        icon = Icons.Default.PlayCircle,
+                        gradientColors = listOf(Color(0xFF7C3AED), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.MOVIES; selectedFilter = "All" },
                         modifier = Modifier.width(220.dp)
                     )
 
                     HubShortcutCard(
-                        title = "News Hub",
+                        title = "Series (VOD)",
+                        subtitle = "${seriesChannels.size} TV series episodes",
+                        icon = Icons.Default.Movie,
+                        gradientColors = listOf(Color(0xFF4F46E5), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "Live Broadcast TV",
+                        subtitle = "${liveChannels.size} live streams",
+                        icon = Icons.Default.LiveTv,
+                        gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.LIVE; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
+                        title = "Sky & News Hub",
                         subtitle = "${skyChannels.size} live news feeds",
                         icon = Icons.AutoMirrored.Filled.Feed,
                         gradientColors = listOf(Color(0xFF0369A1), Color(0xFF0F172A)),
@@ -455,47 +525,20 @@ fun HomeScreen(
                     )
 
                     HubShortcutCard(
+                        title = "Pluto TV FAST",
+                        subtitle = "${plutoChannels.size} 24/7 channels",
+                        icon = Icons.Default.Language,
+                        gradientColors = listOf(Color(0xFFD97706), Color(0xFF0F172A)),
+                        onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" },
+                        modifier = Modifier.width(220.dp)
+                    )
+
+                    HubShortcutCard(
                         title = "Sports Hub",
-                        subtitle = "Highlights & live action",
+                        subtitle = "Highlights & live sports",
                         icon = Icons.Default.SportsSoccer,
                         gradientColors = listOf(Color(0xFF059669), Color(0xFF0F172A)),
                         onClick = { activeSection = NavSection.LIVE; selectedFilter = "Sports" },
-                        modifier = Modifier.width(220.dp)
-                    )
-
-                    HubShortcutCard(
-                        title = "Game Shows & Ent.",
-                        subtitle = "Comedy & entertainment",
-                        icon = Icons.Default.EmojiEvents,
-                        gradientColors = listOf(Color(0xFFD97706), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "Entertainment" },
-                        modifier = Modifier.width(220.dp)
-                    )
-
-                    HubShortcutCard(
-                        title = "Cinema Hub",
-                        subtitle = "${movieChannels.size} feature films",
-                        icon = Icons.Default.Movie,
-                        gradientColors = listOf(Color(0xFF7C3AED), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.MOVIES; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
-
-                    HubShortcutCard(
-                        title = "Series & Binge TV",
-                        subtitle = "${seriesChannels.size} streaming series",
-                        icon = Icons.Default.Tv,
-                        gradientColors = listOf(Color(0xFF4F46E5), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
-
-                    HubShortcutCard(
-                        title = "Wildlife & Docs",
-                        subtitle = "Nature & science docs",
-                        icon = Icons.Default.Pets,
-                        gradientColors = listOf(Color(0xFFEA580C), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "Documentary" },
                         modifier = Modifier.width(220.dp)
                     )
 
@@ -509,20 +552,112 @@ fun HomeScreen(
                     )
                 }
 
-                // Recommended Channels Section Header
+                // ==========================================
+                // VOD FEATURED MOVIES ROW
+                // ==========================================
+                if (movieChannels.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.PlayCircle, contentDescription = null, tint = AccentSky, modifier = Modifier.size(20.dp))
+                            Text(
+                                text = "Featured Movies (On Demand)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                        Text(
+                            text = "View All Movies >",
+                            color = AccentSky,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable { activeSection = NavSection.MOVIES; selectedFilter = "All" }
+                        )
+                    }
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(movieChannels.take(10), key = { "home-movie-${it.id}" }) { movie ->
+                            VodMovieCard(
+                                item = movie,
+                                isFavorite = favoriteIds.value.contains(movie.id),
+                                onToggleFavorite = {
+                                    favoritesManager.toggleFavorite(movie.id)
+                                    refreshFavorites()
+                                },
+                                onClick = { selectedMovieForDetails = movie }
+                            )
+                        }
+                    }
+                }
+
+                // ==========================================
+                // VOD FEATURED SERIES ROW
+                // ==========================================
+                if (seriesChannels.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.Movie, contentDescription = null, tint = AccentGold, modifier = Modifier.size(20.dp))
+                            Text(
+                                text = "Featured Series (On Demand)",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                        Text(
+                            text = "View All Series >",
+                            color = AccentSky,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.clickable { activeSection = NavSection.SERIES; selectedFilter = "All" }
+                        )
+                    }
+
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(seriesChannels.take(10), key = { "home-series-${it.id}" }) { series ->
+                            VodMovieCard(
+                                item = series,
+                                isFavorite = favoriteIds.value.contains(series.id),
+                                onToggleFavorite = {
+                                    favoritesManager.toggleFavorite(series.id)
+                                    refreshFavorites()
+                                },
+                                onClick = { selectedSeriesForEpisodes = series }
+                            )
+                        }
+                    }
+                }
+
+                // ==========================================
+                // RECOMMENDED LIVE CHANNELS
+                // ==========================================
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Recommended Channels",
+                        text = "Live TV Highlights",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
                     Text(
-                        text = "${currentItems.size} streams available",
+                        text = "${liveChannels.size + plutoChannels.size + skyChannels.size} live channels",
                         color = AccentSky,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.SemiBold
@@ -562,9 +697,233 @@ fun HomeScreen(
                     }
                 }
             }
+        } else if (activeSection == NavSection.MOVIES) {
+            // =========================================================
+            // 3. MOVIES VOD SECTION (2:3 POSTER GRID + GENRES + DETAILS MODAL)
+            // =========================================================
+
+            // Header Banner
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "🎬 Movies (VOD On Demand)",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Real on-demand feature films with synopses, ratings, and instant playback.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(PrimaryBlue.copy(alpha = 0.2f))
+                        .border(1.dp, PrimaryBlue, RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "${currentItems.size} Films Available",
+                        color = AccentSky,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            // Movie Genre Filter Chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                movieFilterGenres.forEach { genre ->
+                    val isSelected = selectedFilter.equals(genre, ignoreCase = true)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                            .clickable { selectedFilter = genre }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = genre,
+                            color = if (isSelected) Color.White else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // 6-Column 2:3 Movie Poster Grid
+            if (currentItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.MovieFilter, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
+                        Text("No movies found for '$selectedFilter'", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Try selecting 'All' or searching for another title.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    }
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(6),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    itemsIndexed(
+                        items = currentItems,
+                        key = { index, it -> "vod-movie-${it.id}-$index" }
+                    ) { _, movie ->
+                        VodMovieCard(
+                            item = movie,
+                            isFavorite = favoriteIds.value.contains(movie.id),
+                            onToggleFavorite = {
+                                favoritesManager.toggleFavorite(movie.id)
+                                refreshFavorites()
+                            },
+                            onClick = {
+                                selectedMovieForDetails = movie
+                            }
+                        )
+                    }
+                }
+            }
+        } else if (activeSection == NavSection.SERIES) {
+            // =========================================================
+            // 4. SERIES VOD SECTION (2:3 POSTER GRID + EPISODE PICKER)
+            // =========================================================
+
+            // Header Banner
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "📺 TV Series (VOD On Demand)",
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = TextPrimary
+                    )
+                    Text(
+                        text = "Episodic television series on demand with full seasons and episode picker.",
+                        color = TextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF4F46E5).copy(alpha = 0.2f))
+                        .border(1.dp, Color(0xFF4F46E5), RoundedCornerShape(8.dp))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "${currentItems.size} Series Available",
+                        color = AccentSky,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+
+            // Series Genre Filter Chips
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                seriesFilterGenres.forEach { genre ->
+                    val isSelected = selectedFilter.equals(genre, ignoreCase = true)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                            .clickable { selectedFilter = genre }
+                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = genre,
+                            color = if (isSelected) Color.White else TextSecondary,
+                            fontSize = 12.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                        )
+                    }
+                }
+            }
+
+            // 6-Column 2:3 Series Poster Grid
+            if (currentItems.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Tv, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
+                        Text("No series found for '$selectedFilter'", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                        Text("Try selecting 'All' or searching for another title.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                    }
+                }
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(6),
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    itemsIndexed(
+                        items = currentItems,
+                        key = { index, it -> "vod-series-${it.id}-$index" }
+                    ) { _, series ->
+                        VodMovieCard(
+                            item = series,
+                            isFavorite = favoriteIds.value.contains(series.id),
+                            onToggleFavorite = {
+                                favoritesManager.toggleFavorite(series.id)
+                                refreshFavorites()
+                            },
+                            onClick = {
+                                selectedSeriesForEpisodes = series
+                            }
+                        )
+                    }
+                }
+            }
         } else {
             // =========================================================
-            // 3. DEDICATED CHANNEL BROWSING VIEW (LIVE / PLUTO / SKY / MOVIES / SERIES)
+            // 5. DEDICATED LIVE BROADCAST CHANNEL BROWSING (LIVE / PLUTO / SKY / RADIO / FAVORITES)
             // =========================================================
 
             // Focused Channel Header Bar (Compact EPG Now & Next)
@@ -576,7 +935,7 @@ fun HomeScreen(
                 }
             )
 
-            // Horizontal Filter Chips Row (Countries & Categories)
+            // Horizontal Filter Chips Row (Categories & Countries)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -585,7 +944,7 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Category Pills
-                filterCategories.forEach { cat ->
+                liveFilterCategories.forEach { cat ->
                     val isSelected = selectedFilter.equals(cat, ignoreCase = true)
                     Box(
                         modifier = Modifier
@@ -604,28 +963,30 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.width(4.dp))
-                Box(modifier = Modifier.width(1.dp).height(20.dp).background(BorderSubtle))
-                Spacer(modifier = Modifier.width(4.dp))
+                if (activeSection == NavSection.LIVE || activeSection == NavSection.FAVORITES) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Box(modifier = Modifier.width(1.dp).height(20.dp).background(BorderSubtle))
+                    Spacer(modifier = Modifier.width(4.dp))
 
-                // Country Pills
-                countriesList.forEach { (code, label) ->
-                    val isSelected = selectedFilter.equals(code, ignoreCase = true)
-                    val count = countryCounts[code] ?: 0
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
-                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                    // Country Pills
+                    countriesList.forEach { (code, label) ->
+                        val isSelected = selectedFilter.equals(code, ignoreCase = true)
+                        val count = countryCounts[code] ?: 0
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                                .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
                             .clickable { selectedFilter = code }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = if (count > 0) "$label ($count)" else label,
-                            color = if (isSelected) Color.White else TextSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                        )
+                        ) {
+                            Text(
+                                text = if (count > 0) "$label ($count)" else label,
+                                color = if (isSelected) Color.White else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
                     }
                 }
             }

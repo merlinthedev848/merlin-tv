@@ -1,8 +1,8 @@
 {
-  "version": "1.3.3",
-  "versionCode": 133,
+  "version": "1.4.0",
+  "versionCode": 140,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.3.3",
-  "releaseNotes": "Merlin TV v1.3.3 Release: Modern D-Pad Android TV interface with top horizontal navigation bar, 8-card Featured Hubs showcase, dedicated Sports pipeline (sports.m3u), preloaded 19 country playlists, 18 category feeds, and in-player quick channel guide.",
-  "publishedAt": "2026-09-20T15:20:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.0",
+  "releaseNotes": "Merlin TV v1.4.0: Complete True VOD and Categorized Live TV overhaul. Features dedicated On-Demand Movies section with 2:3 vertical posters, synopses, ratings, and instant playback; dedicated On-Demand TV Series section with season/episode selector modal; and cleanly categorized, deduplicated Live TV with noise-free stream titles and instant country filtering.",
+  "publishedAt": "2026-09-20T15:46:00Z"
 }

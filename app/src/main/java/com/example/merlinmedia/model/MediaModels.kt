@@ -9,7 +9,15 @@ data class MediaEntry(
     val group: String = "",
     val logo: String? = null,
     val description: String = "",
-    val source: String = ""
+    val source: String = "",
+    val year: String = "",
+    val duration: String = "",
+    val genre: String = "",
+    val rating: String = "",
+    val season: Int? = null,
+    val episode: Int? = null,
+    val backdrop: String? = null,
+    val isVod: Boolean = false
 )
 
 enum class Kind {
