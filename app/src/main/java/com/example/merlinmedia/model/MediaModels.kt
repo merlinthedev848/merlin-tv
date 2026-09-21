@@ -18,7 +18,8 @@ data class MediaEntry(
     val episode: Int? = null,
     val backdrop: String? = null,
     val isVod: Boolean = false,
-    val quality: String = "1080p"
+    val quality: String = "1080p",
+    val tvgId: String = ""
 )
 
 enum class Kind {
@@ -27,6 +28,7 @@ enum class Kind {
     SKY,
     MOVIE,
     SERIES,
+    RADIO,
     FAVORITES
 }
 
@@ -35,6 +37,14 @@ enum class AspectRatioMode(val label: String) {
     ZOOM("Zoom (Fill)"),
     STRETCH("Stretch")
 }
+
+data class EpgProgram(
+    val title: String,
+    val startFormatted: String = "",
+    val stopFormatted: String = "",
+    val description: String = "",
+    val progress: Float = 0f
+)
 
 data class UpdateInfo(
     val version: String,

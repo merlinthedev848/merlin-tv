@@ -1,7 +1,6 @@
 package com.example.merlinmedia.ui.screens
 
 import androidx.compose.animation.*
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,7 +17,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Feed
-import androidx.compose.material.icons.automirrored.filled.MenuBook
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,17 +24,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.merlinmedia.BuildConfig
-import com.example.merlinmedia.data.CatalogRepository
+import com.example.merlinmedia.data.EpgRepository
 import com.example.merlinmedia.data.FavoritesManager
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.model.UpdateInfo
 import com.example.merlinmedia.ui.components.*
 import com.example.merlinmedia.ui.theme.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 enum class NavSection {
     HOME,
@@ -66,11 +66,17 @@ fun HomeScreen(
     onOpenSettingsDialog: () -> Unit,
     onRefreshChannels: () -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var activeSection by remember { mutableStateOf(NavSection.HOME) }
     var selectedFilter by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
-    val favoriteIds = remember { mutableStateOf(favoritesManager.getFavoriteIds()) }
+
+    val favoriteIds by favoritesManager.favoriteIds.collectAsState()
+    val recentHistory by favoritesManager.recentHistory.collectAsState()
+
     var focusedItem by remember { mutableStateOf<MediaEntry?>(null) }
     var focusedIndex by remember { mutableIntStateOf(101) }
 
@@ -81,7 +87,7 @@ fun HomeScreen(
     // Hero Carousel Index
     var heroSlideIndex by remember { mutableIntStateOf(0) }
 
-    // Live Clock State (Format: 8:57 PM Tue, 25 Aug)
+    // Live Clock State
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         val formatter = java.text.SimpleDateFormat("h:mm a  EEE, dd MMM", java.util.Locale.getDefault())
@@ -91,16 +97,11 @@ fun HomeScreen(
         }
     }
 
-    // Auto-cycle Hero Carousel every 8 seconds
+    // Initialize EPG repository in background
     LaunchedEffect(Unit) {
-        while (true) {
-            kotlinx.coroutines.delay(8000)
-            heroSlideIndex = (heroSlideIndex + 1) % 4
+        coroutineScope.launch(Dispatchers.IO) {
+            EpgRepository.initialize(context)
         }
-    }
-
-    fun refreshFavorites() {
-        favoriteIds.value = favoritesManager.getFavoriteIds()
     }
 
     val countriesList = listOf(
@@ -125,7 +126,6 @@ fun HomeScreen(
         "Mexico" to "🇲🇽 Mexico"
     )
 
-    // Accurate Country Counts
     val countryCounts = remember(liveChannels) {
         countriesList.associate { (code, _) ->
             val count = liveChannels.count { item ->
@@ -136,25 +136,39 @@ fun HomeScreen(
         }
     }
 
-    // Dynamic Filter Categories for Live TV
     val liveFilterCategories = listOf(
         "All", "News", "Sports", "Entertainment", "Series & Drama",
         "Documentaries", "Kids", "Animation", "Comedy", "Music", "Cooking",
         "Travel", "Science", "Education", "Business", "Weather", "Classic", "Auto"
     )
 
-    // Movie Genres
     val movieFilterGenres = listOf(
         "All", "Sci-Fi", "Action", "Horror", "Thriller", "Comedy", "Drama", "Fantasy", "Classic", "Animation"
     )
 
-    // Series Genres
     val seriesFilterGenres = listOf(
         "All", "Comedy", "Western", "Animation", "Drama", "Sci-Fi", "Classic"
     )
 
+    val heroSlides = listOf(
+        Triple("VOD Movies & Releases", "Feature Films On Demand", "Stream full-length high quality movies, classic cinema & cult favourites with synopsis and ratings.") to { activeSection = NavSection.MOVIES },
+        Triple("Episodic TV Series", "Binge-Worthy Series On Demand", "Watch complete seasons and episodes of all-time classic TV series with episode guide.") to { activeSection = NavSection.SERIES },
+        Triple("Sky & News Network", "The world, live in 1080p FHD", "Watch live Sky News UK, BBC News, Bloomberg Europe, France 24, DW & breaking global reporting.") to { activeSection = NavSection.SKY },
+        Triple("Worldwide Live TV", "1,500+ Live Broadcast Streams", "Instant live TV from the United Kingdom, USA, Canada, Australia, France, Germany & Europe.") to { activeSection = NavSection.LIVE }
+    )
+
+    // Auto-cycle Hero Carousel safely
+    LaunchedEffect(heroSlides.size) {
+        while (true) {
+            kotlinx.coroutines.delay(8000)
+            if (heroSlides.isNotEmpty()) {
+                heroSlideIndex = (heroSlideIndex + 1) % heroSlides.size
+            }
+        }
+    }
+
     // Filter Logic based on Active Section
-    val currentItems = remember(activeSection, selectedFilter, searchQuery, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds.value) {
+    val currentItems = remember(activeSection, selectedFilter, searchQuery, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds) {
         val baseList = when (activeSection) {
             NavSection.HOME, NavSection.HUB -> skyChannels + plutoChannels.take(40) + liveChannels.take(40) + movieChannels.take(20)
             NavSection.LIVE -> liveChannels
@@ -164,9 +178,8 @@ fun HomeScreen(
             NavSection.SERIES -> seriesChannels
             NavSection.RADIO -> liveChannels.filter { it.group.contains("music", ignoreCase = true) || it.title.contains("radio", ignoreCase = true) }
             NavSection.FAVORITES -> {
-                val favSet = favoriteIds.value
                 val allKnown = liveChannels + plutoChannels + skyChannels + movieChannels + seriesChannels
-                allKnown.filter { favSet.contains(it.id) }
+                allKnown.filter { favoriteIds.contains(it.id) }
             }
         }
 
@@ -202,7 +215,7 @@ fun HomeScreen(
         }
     }
 
-    // Keep focusedItem and its channel number in sync
+    // Keep focusedItem in sync
     LaunchedEffect(currentItems) {
         if (currentItems.isNotEmpty() && (focusedItem == null || !currentItems.contains(focusedItem))) {
             focusedItem = currentItems.first()
@@ -217,10 +230,9 @@ fun HomeScreen(
     selectedMovieForDetails?.let { movie ->
         VodDetailsDialog(
             item = movie,
-            isFavorite = favoriteIds.value.contains(movie.id),
+            isFavorite = favoriteIds.contains(movie.id),
             onToggleFavorite = {
                 favoritesManager.toggleFavorite(movie.id)
-                refreshFavorites()
             },
             onPlay = {
                 onSelectChannel(movie, movieChannels)
@@ -254,6 +266,42 @@ fun HomeScreen(
             .padding(horizontal = 20.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
+        // Offline Warning Banner
+        if (!isOnline) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFB91C1C))
+                    .padding(horizontal = 14.dp, vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.WifiOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                    Text(
+                        text = "You are currently offline. Showing cached channels and downloads.",
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+
+                Button(
+                    onClick = onRefreshChannels,
+                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(6.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                    modifier = Modifier.height(28.dp)
+                ) {
+                    Text("Retry", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
         // ==========================================
         // 1. TOP HORIZONTAL NAVIGATION & ACTION BAR
         // ==========================================
@@ -359,7 +407,6 @@ fun HomeScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Live Clock Pill
                 Text(
                     text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
                     color = TextPrimary,
@@ -400,7 +447,6 @@ fun HomeScreen(
                     onClick = {
                         activeSection = NavSection.FAVORITES
                         selectedFilter = "All"
-                        refreshFavorites()
                     },
                     modifier = Modifier
                         .size(32.dp)
@@ -447,7 +493,6 @@ fun HomeScreen(
         // 2. MAIN CONTENT VIEW
         // =========================================================
         if (activeSection == NavSection.HOME || activeSection == NavSection.HUB) {
-            // Scrollable Home / Hub Dashboard Layout
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -455,26 +500,72 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 // Hero Feature Banner Carousel
-                val heroSlides = listOf(
-                    Triple("VOD Movies & Releases", "Feature Films On Demand", "Stream full-length high quality movies, classic cinema & cult favourites with synopsis and ratings.") to { activeSection = NavSection.MOVIES },
-                    Triple("Episodic TV Series", "Binge-Worthy Series On Demand", "Watch complete seasons and episodes of all-time classic TV series with episode guide.") to { activeSection = NavSection.SERIES },
-                    Triple("Sky & News Network", "The world, live in 1080p FHD", "Watch live Sky News UK, BBC News, Bloomberg Europe, France 24, DW & breaking global reporting.") to { activeSection = NavSection.SKY },
-                    Triple("Worldwide Live TV", "1,500+ Live Broadcast Streams", "Instant live TV from the United Kingdom, USA, Canada, Australia, France, Germany & Europe.") to { activeSection = NavSection.LIVE }
-                )
+                if (heroSlides.isNotEmpty()) {
+                    val safeIndex = heroSlideIndex.coerceIn(0, heroSlides.size - 1)
+                    val (slideInfo, slideAction) = heroSlides[safeIndex]
 
-                val (slideInfo, slideAction) = heroSlides[heroSlideIndex]
+                    HeroFeatureBanner(
+                        tag = "MerlinTV Feature",
+                        title = slideInfo.second,
+                        subtitle = slideInfo.third,
+                        actionLabel = "Explore ${slideInfo.first}",
+                        activeDotIndex = safeIndex,
+                        totalDots = heroSlides.size,
+                        onActionClick = slideAction
+                    )
+                }
 
-                HeroFeatureBanner(
-                    tag = "MerlinTV Feature",
-                    title = slideInfo.second,
-                    subtitle = slideInfo.third,
-                    actionLabel = "Explore ${slideInfo.first}",
-                    activeDotIndex = heroSlideIndex,
-                    totalDots = 4,
-                    onActionClick = slideAction
-                )
+                // ==========================================
+                // RECENTLY WATCHED ROW
+                // ==========================================
+                if (recentHistory.isNotEmpty()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Icon(Icons.Default.History, contentDescription = null, tint = AccentSky, modifier = Modifier.size(20.dp))
+                            Text(
+                                text = "Recently Watched / History",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = TextPrimary
+                            )
+                        }
+                    }
 
-                // Featured Hubs Row (8-Card Showcase)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        items(recentHistory.take(12), key = { "recent-${it.id}-${it.url}" }) { item ->
+                            if (item.isVod) {
+                                VodMovieCard(
+                                    item = item,
+                                    isFavorite = favoriteIds.contains(item.id),
+                                    onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
+                                    onClick = {
+                                        if (item.type == Kind.SERIES) selectedSeriesForEpisodes = item
+                                        else selectedMovieForDetails = item
+                                    }
+                                )
+                            } else {
+                                ChannelGridCard(
+                                    item = item,
+                                    channelNumber = 101,
+                                    isFavorite = favoriteIds.contains(item.id),
+                                    onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
+                                    onFocusChange = { focusedItem = item },
+                                    onClick = { onSelectChannel(item, recentHistory) },
+                                    modifier = Modifier.width(190.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Featured Hubs Row
                 Text(
                     text = "Featured Hubs",
                     style = MaterialTheme.typography.titleMedium,
@@ -552,9 +643,7 @@ fun HomeScreen(
                     )
                 }
 
-                // ==========================================
-                // VOD FEATURED MOVIES ROW
-                // ==========================================
+                // Featured Movies Row
                 if (movieChannels.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -586,10 +675,9 @@ fun HomeScreen(
                         items(movieChannels.take(10), key = { "home-movie-${it.id}" }) { movie ->
                             VodMovieCard(
                                 item = movie,
-                                isFavorite = favoriteIds.value.contains(movie.id),
+                                isFavorite = favoriteIds.contains(movie.id),
                                 onToggleFavorite = {
                                     favoritesManager.toggleFavorite(movie.id)
-                                    refreshFavorites()
                                 },
                                 onClick = { selectedMovieForDetails = movie }
                             )
@@ -597,9 +685,7 @@ fun HomeScreen(
                     }
                 }
 
-                // ==========================================
-                // VOD FEATURED SERIES ROW
-                // ==========================================
+                // Featured Series Row
                 if (seriesChannels.isNotEmpty()) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -631,10 +717,9 @@ fun HomeScreen(
                         items(seriesChannels.take(10), key = { "home-series-${it.id}" }) { series ->
                             VodMovieCard(
                                 item = series,
-                                isFavorite = favoriteIds.value.contains(series.id),
+                                isFavorite = favoriteIds.contains(series.id),
                                 onToggleFavorite = {
                                     favoritesManager.toggleFavorite(series.id)
-                                    refreshFavorites()
                                 },
                                 onClick = { selectedSeriesForEpisodes = series }
                             )
@@ -642,9 +727,7 @@ fun HomeScreen(
                     }
                 }
 
-                // ==========================================
-                // RECOMMENDED LIVE CHANNELS
-                // ==========================================
+                // Recommended Live Channels
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -664,7 +747,6 @@ fun HomeScreen(
                     )
                 }
 
-                // Recommended Grid in Home
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(5),
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
@@ -681,10 +763,9 @@ fun HomeScreen(
                         ChannelGridCard(
                             item = item,
                             channelNumber = chNum,
-                            isFavorite = favoriteIds.value.contains(item.id),
+                            isFavorite = favoriteIds.contains(item.id),
                             onToggleFavorite = {
                                 favoritesManager.toggleFavorite(item.id)
-                                refreshFavorites()
                             },
                             onFocusChange = {
                                 focusedItem = item
@@ -698,10 +779,6 @@ fun HomeScreen(
                 }
             }
         } else if (activeSection == NavSection.MOVIES) {
-            // =========================================================
-            // 3. MOVIES VOD SECTION (2:3 POSTER GRID + GENRES + DETAILS MODAL)
-            // =========================================================
-
             // Header Banner
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -797,10 +874,9 @@ fun HomeScreen(
                     ) { _, movie ->
                         VodMovieCard(
                             item = movie,
-                            isFavorite = favoriteIds.value.contains(movie.id),
+                            isFavorite = favoriteIds.contains(movie.id),
                             onToggleFavorite = {
                                 favoritesManager.toggleFavorite(movie.id)
-                                refreshFavorites()
                             },
                             onClick = {
                                 selectedMovieForDetails = movie
@@ -810,11 +886,7 @@ fun HomeScreen(
                 }
             }
         } else if (activeSection == NavSection.SERIES) {
-            // =========================================================
-            // 4. SERIES VOD SECTION (2:3 POSTER GRID + EPISODE PICKER)
-            // =========================================================
-
-            // Header Banner
+            // Series Header Banner
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -909,10 +981,9 @@ fun HomeScreen(
                     ) { _, series ->
                         VodMovieCard(
                             item = series,
-                            isFavorite = favoriteIds.value.contains(series.id),
+                            isFavorite = favoriteIds.contains(series.id),
                             onToggleFavorite = {
                                 favoritesManager.toggleFavorite(series.id)
-                                refreshFavorites()
                             },
                             onClick = {
                                 selectedSeriesForEpisodes = series
@@ -922,11 +993,7 @@ fun HomeScreen(
                 }
             }
         } else {
-            // =========================================================
-            // 5. DEDICATED LIVE BROADCAST CHANNEL BROWSING (LIVE / PLUTO / SKY / RADIO / FAVORITES)
-            // =========================================================
-
-            // Focused Channel Header Bar (Compact EPG Now & Next)
+            // Live / Pluto / Sky / Radio / Favorites Grid
             FocusedChannelHeaderBar(
                 item = focusedItem,
                 channelNumber = focusedIndex,
@@ -935,7 +1002,7 @@ fun HomeScreen(
                 }
             )
 
-            // Horizontal Filter Chips Row (Categories & Countries)
+            // Horizontal Filter Chips Row
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -943,7 +1010,6 @@ fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Category Pills
                 liveFilterCategories.forEach { cat ->
                     val isSelected = selectedFilter.equals(cat, ignoreCase = true)
                     Box(
@@ -968,7 +1034,6 @@ fun HomeScreen(
                     Box(modifier = Modifier.width(1.dp).height(20.dp).background(BorderSubtle))
                     Spacer(modifier = Modifier.width(4.dp))
 
-                    // Country Pills
                     countriesList.forEach { (code, label) ->
                         val isSelected = selectedFilter.equals(code, ignoreCase = true)
                         val count = countryCounts[code] ?: 0
@@ -977,8 +1042,8 @@ fun HomeScreen(
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
                                 .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
-                            .clickable { selectedFilter = code }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .clickable { selectedFilter = code }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text(
                                 text = if (count > 0) "$label ($count)" else label,
@@ -1034,10 +1099,9 @@ fun HomeScreen(
                         ChannelGridCard(
                             item = item,
                             channelNumber = chNum,
-                            isFavorite = favoriteIds.value.contains(item.id),
+                            isFavorite = favoriteIds.contains(item.id),
                             onToggleFavorite = {
                                 favoritesManager.toggleFavorite(item.id)
-                                refreshFavorites()
                             },
                             onFocusChange = {
                                 focusedItem = item

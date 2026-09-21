@@ -11,6 +11,7 @@ import okhttp3.Request
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.util.Collections
 
 data class AllCatalogsResult(
     val live: List<MediaEntry>,
@@ -21,6 +22,8 @@ data class AllCatalogsResult(
 )
 
 object CatalogRepository {
+
+    private const val CACHE_TTL_MS = 6 * 60 * 60 * 1000L // 6 hours
 
     val availableCountries = listOf(
         "UK" to "https://iptv-org.github.io/iptv/countries/uk.m3u",
@@ -63,34 +66,18 @@ object CatalogRepository {
     private const val MUSIC_PLAYLIST = "https://iptv-org.github.io/iptv/categories/music.m3u"
     private const val COMEDY_PLAYLIST = "https://iptv-org.github.io/iptv/categories/comedy.m3u"
     private const val SPORTS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/sports.m3u"
-    private const val USA_COUNTRY_PLAYLIST = "https://iptv-org.github.io/iptv/countries/us.m3u"
     private const val CLASSIC_MOVIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/classic.m3u"
     private const val SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/series.m3u"
     private const val ENTERTAINMENT_PLAYLIST = "https://iptv-org.github.io/iptv/categories/entertainment.m3u"
     private const val KIDS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/kids.m3u"
     private const val ANIMATION_SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/animation.m3u"
-    private const val COOKING_PLAYLIST = "https://iptv-org.github.io/iptv/categories/cooking.m3u"
-    private const val TRAVEL_PLAYLIST = "https://iptv-org.github.io/iptv/categories/travel.m3u"
-    private const val SCIENCE_PLAYLIST = "https://iptv-org.github.io/iptv/categories/science.m3u"
-    private const val EDUCATION_PLAYLIST = "https://iptv-org.github.io/iptv/categories/education.m3u"
-    private const val BUSINESS_PLAYLIST = "https://iptv-org.github.io/iptv/categories/business.m3u"
-    private const val WEATHER_PLAYLIST = "https://iptv-org.github.io/iptv/categories/weather.m3u"
     private const val AUTO_PLAYLIST = "https://iptv-org.github.io/iptv/categories/auto.m3u"
 
-    @Volatile
-    private var cachedLiveChannels: List<MediaEntry> = emptyList()
-
-    @Volatile
-    private var cachedPlutoChannels: List<MediaEntry> = emptyList()
-
-    @Volatile
-    private var cachedSkyChannels: List<MediaEntry> = emptyList()
-
-    @Volatile
-    private var cachedMovieChannels: List<MediaEntry> = emptyList()
-
-    @Volatile
-    private var cachedSeriesChannels: List<MediaEntry> = emptyList()
+    @Volatile private var cachedLiveChannels: List<MediaEntry> = emptyList()
+    @Volatile private var cachedPlutoChannels: List<MediaEntry> = emptyList()
+    @Volatile private var cachedSkyChannels: List<MediaEntry> = emptyList()
+    @Volatile private var cachedMovieChannels: List<MediaEntry> = emptyList()
+    @Volatile private var cachedSeriesChannels: List<MediaEntry> = emptyList()
 
     fun getSelectedCountryCodes(context: Context): Set<String> {
         val prefs = context.getSharedPreferences("merlin_country_prefs", Context.MODE_PRIVATE)
@@ -103,7 +90,7 @@ object CatalogRepository {
             .edit()
             .putStringSet("selected_countries", countries)
             .apply()
-        cachedLiveChannels = emptyList() // Invalidate cache
+        cachedLiveChannels = emptyList()
     }
 
     private fun fetchM3uContent(context: Context?, url: String): String {
@@ -130,17 +117,8 @@ object CatalogRepository {
         }
     }
 
-    fun sanitizeChannelTitle(raw: String): String {
-        return raw
-            .replace(Regex("\\[.*?\\]"), "")
-            .replace(Regex("\\(.*?p\\)", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\(.*?fps\\)", RegexOption.IGNORE_CASE), "")
-            .replace(Regex("\\s+"), " ")
-            .trim()
-    }
-
     // ==========================================
-    // DISK CACHING MECHANISM FOR INSTANT OFFLINE
+    // DISK CACHING WITH TTL FOR INSTANT OFFLINE
     // ==========================================
     private fun getCacheFile(context: Context, categoryName: String): File {
         val cacheDir = File(context.cacheDir, "catalogs")
@@ -151,6 +129,8 @@ object CatalogRepository {
     private fun saveToDiskCache(context: Context, categoryName: String, items: List<MediaEntry>) {
         runCatching {
             val file = getCacheFile(context, categoryName)
+            val root = JSONObject()
+            root.put("timestamp", System.currentTimeMillis())
             val jsonArray = JSONArray()
             items.forEach { entry ->
                 val obj = JSONObject().apply {
@@ -172,20 +152,34 @@ object CatalogRepository {
                     put("backdrop", entry.backdrop ?: "")
                     put("isVod", entry.isVod)
                     put("quality", entry.quality)
+                    put("tvgId", entry.tvgId)
                 }
                 jsonArray.put(obj)
             }
-            file.writeText(jsonArray.toString())
+            root.put("items", jsonArray)
+            file.writeText(root.toString())
         }
     }
 
-    private fun loadFromDiskCache(context: Context, categoryName: String): List<MediaEntry> {
+    private fun loadFromDiskCache(context: Context, categoryName: String, ignoreTtl: Boolean = false): List<MediaEntry> {
         return runCatching {
             val file = getCacheFile(context, categoryName)
             if (!file.exists()) return emptyList()
             val content = file.readText()
             if (content.isBlank()) return emptyList()
-            val jsonArray = JSONArray(content)
+
+            val jsonArray: JSONArray
+            if (content.trim().startsWith("{")) {
+                val root = JSONObject(content)
+                val timestamp = root.optLong("timestamp", 0L)
+                if (!ignoreTtl && (System.currentTimeMillis() - timestamp > CACHE_TTL_MS)) {
+                    return emptyList()
+                }
+                jsonArray = root.optJSONArray("items") ?: return emptyList()
+            } else {
+                jsonArray = JSONArray(content)
+            }
+
             val list = mutableListOf<MediaEntry>()
             for (i in 0 until jsonArray.length()) {
                 val obj = jsonArray.getJSONObject(i)
@@ -208,7 +202,8 @@ object CatalogRepository {
                         episode = if (obj.has("episode")) obj.optInt("episode") else null,
                         backdrop = obj.optString("backdrop").ifBlank { null },
                         isVod = obj.optBoolean("isVod", false),
-                        quality = obj.optString("quality", "1080p")
+                        quality = obj.optString("quality", "1080p"),
+                        tvgId = obj.optString("tvgId")
                     )
                 )
             }
@@ -232,7 +227,7 @@ object CatalogRepository {
             }
         }
 
-        val allEntries = mutableListOf<MediaEntry>()
+        val allEntries = Collections.synchronizedList(mutableListOf<MediaEntry>())
         allEntries.addAll(curatedLiveChannels)
 
         val activeCountries = context?.let { getSelectedCountryCodes(it) } ?: availableCountries.map { it.first }.toSet()
@@ -259,19 +254,6 @@ object CatalogRepository {
                         }
                     }
                 }
-
-            val usaTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(context, USA_COUNTRY_PLAYLIST)
-                if (body.isNotBlank()) {
-                    val parsed = M3uParser.parse(body, defaultCountry = "USA", defaultKind = Kind.LIVE, sourceLabel = "iptv-org USA")
-                    parsed.map { entry ->
-                        val grp = if (entry.group.isNotBlank() && !entry.group.equals("General", ignoreCase = true))
-                            "USA | ${entry.group.trim().uppercase()}"
-                        else "USA | BROADCAST"
-                        entry.copy(country = "USA", group = grp)
-                    }
-                } else emptyList()
-            }
 
             val sportsTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, SPORTS_PLAYLIST)
@@ -378,17 +360,15 @@ object CatalogRepository {
 
             fun processAndAdd(entry: MediaEntry) {
                 val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, entry.quality.ifBlank { "1080p" })
-                val clean = sanitizeChannelTitle(entry.title)
+                val clean = M3uParser.cleanChannelTitle(entry.title)
                 if (clean.isNotBlank()) {
                     allEntries.add(entry.copy(title = clean, type = Kind.LIVE, isVod = false, quality = qual))
                 }
             }
 
             countryTasks.forEach { task ->
-                val channels = task.await()
-                channels.forEach { processAndAdd(it) }
+                task.await().forEach { processAndAdd(it) }
             }
-            usaTask.await().forEach { processAndAdd(it) }
             sportsTask.await().forEach { processAndAdd(it) }
             newsTask.await().forEach { processAndAdd(it) }
             documentaryTask.await().forEach { processAndAdd(it) }
@@ -402,18 +382,18 @@ object CatalogRepository {
             }
         }
 
-        val distinctList = allEntries
+        val distinctList = allEntries.toList()
             .filter { it.url.isNotBlank() && it.title.isNotBlank() }
             .distinctBy { it.url }
         cachedLiveChannels = distinctList
-        if (context != null) {
+        if (context != null && distinctList.isNotEmpty()) {
             saveToDiskCache(context, "live", distinctList)
         }
         distinctList
     }
 
     /**
-     * Load dedicated Pluto TV and FAST channels (Pluto All, Samsung TV+, Xiaomi, Rakuten TV UK, etc.)
+     * Load dedicated Pluto TV and FAST channels (Pluto All, Samsung TV+, Xiaomi, Rakuten TV UK, Plex etc.)
      */
     suspend fun loadPluto(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedPlutoChannels.isNotEmpty() && !forceRefresh) {
@@ -428,7 +408,7 @@ object CatalogRepository {
             }
         }
 
-        val allEntries = mutableListOf<MediaEntry>()
+        val allEntries = Collections.synchronizedList(mutableListOf<MediaEntry>())
 
         coroutineScope {
             val plutoAllTask = async(Dispatchers.IO) {
@@ -438,7 +418,7 @@ object CatalogRepository {
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "720p")
-                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                        entry.copy(title = M3uParser.cleanChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -450,7 +430,7 @@ object CatalogRepository {
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Samsung | ${entry.group.trim().uppercase()}" else "Samsung | GENERAL"
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
-                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                        entry.copy(title = M3uParser.cleanChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -462,7 +442,7 @@ object CatalogRepository {
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Xiaomi | ${entry.group.trim().uppercase()}" else "Xiaomi | FAST"
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
-                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                        entry.copy(title = M3uParser.cleanChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -474,7 +454,7 @@ object CatalogRepository {
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Rakuten | ${entry.group.trim().uppercase()}" else "Rakuten | UK"
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
-                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, country = "UK", group = grp, quality = qual)
+                        entry.copy(title = M3uParser.cleanChannelTitle(entry.title), type = Kind.PLUTO, country = "UK", group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -486,7 +466,7 @@ object CatalogRepository {
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Plex | ${entry.group.trim().uppercase()}" else "Plex | FAST"
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
-                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
+                        entry.copy(title = M3uParser.cleanChannelTitle(entry.title), type = Kind.PLUTO, group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -498,7 +478,7 @@ object CatalogRepository {
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "720p")
-                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, country = "UK", group = grp, quality = qual)
+                        entry.copy(title = M3uParser.cleanChannelTitle(entry.title), type = Kind.PLUTO, country = "UK", group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -510,7 +490,7 @@ object CatalogRepository {
                     parsed.map { entry ->
                         val grp = if (entry.group.isNotBlank()) "Pluto | ${entry.group.trim().uppercase()}" else "Pluto | GENERAL"
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "720p")
-                        entry.copy(title = sanitizeChannelTitle(entry.title), type = Kind.PLUTO, country = "USA", group = grp, quality = qual)
+                        entry.copy(title = M3uParser.cleanChannelTitle(entry.title), type = Kind.PLUTO, country = "USA", group = grp, quality = qual)
                     }
                 } else emptyList()
             }
@@ -524,9 +504,9 @@ object CatalogRepository {
             allEntries.addAll(plutoUsTask.await())
         }
 
-        val distinctList = allEntries.distinctBy { it.url }
+        val distinctList = allEntries.toList().distinctBy { it.url }
         cachedPlutoChannels = distinctList
-        if (context != null) {
+        if (context != null && distinctList.isNotEmpty()) {
             saveToDiskCache(context, "pluto", distinctList)
         }
         distinctList
@@ -550,14 +530,14 @@ object CatalogRepository {
 
         val skyList = curatedSkyChannels.map { it.copy(type = Kind.SKY, quality = it.quality.ifBlank { "1080p" }) }
         cachedSkyChannels = skyList
-        if (context != null) {
+        if (context != null && skyList.isNotEmpty()) {
             saveToDiskCache(context, "sky", skyList)
         }
         skyList
     }
 
     /**
-     * Load dynamic real Movies VOD catalog with actual feature film releases, poster art, and full metadata.
+     * Load dynamic real Movies VOD catalog with feature film releases, poster art, and metadata.
      */
     suspend fun loadMovies(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedMovieChannels.isNotEmpty() && !forceRefresh) {
@@ -572,7 +552,7 @@ object CatalogRepository {
             }
         }
 
-        val allEntries = mutableListOf<MediaEntry>()
+        val allEntries = Collections.synchronizedList(mutableListOf<MediaEntry>())
         allEntries.addAll(curatedMovies)
 
         coroutineScope {
@@ -581,7 +561,7 @@ object CatalogRepository {
                 if (body.isNotBlank()) {
                     val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.MOVIE, sourceLabel = "Cinema")
                     parsed.map { entry ->
-                        val clean = sanitizeChannelTitle(entry.title)
+                        val clean = M3uParser.cleanChannelTitle(entry.title)
                         val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
                         entry.copy(
                             title = clean,
@@ -594,19 +574,40 @@ object CatalogRepository {
                     }
                 } else emptyList()
             }
+
+            val classicMoviesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, CLASSIC_MOVIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.MOVIE, sourceLabel = "Classic Cinema")
+                    parsed.map { entry ->
+                        val clean = M3uParser.cleanChannelTitle(entry.title)
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(
+                            title = clean,
+                            type = Kind.MOVIE,
+                            isVod = true,
+                            quality = qual,
+                            genre = "Classic",
+                            description = if (entry.description.isNotBlank()) entry.description else "Classic golden-age feature film streamed in high fidelity."
+                        )
+                    }
+                } else emptyList()
+            }
+
             allEntries.addAll(movieChannelsTask.await())
+            allEntries.addAll(classicMoviesTask.await())
         }
 
-        val distinctList = allEntries.distinctBy { it.url }
+        val distinctList = allEntries.toList().distinctBy { it.url }
         cachedMovieChannels = distinctList
-        if (context != null) {
+        if (context != null && distinctList.isNotEmpty()) {
             saveToDiskCache(context, "movies", distinctList)
         }
         distinctList
     }
 
     /**
-     * Load dynamic real TV Series VOD catalog with episodic shows, season & episode info, and posters.
+     * Load dynamic real TV Series VOD catalog with episodic shows and curated series.
      */
     suspend fun loadSeries(context: Context? = null, forceRefresh: Boolean = false): List<MediaEntry> = withContext(Dispatchers.IO) {
         if (cachedSeriesChannels.isNotEmpty() && !forceRefresh) {
@@ -621,12 +622,55 @@ object CatalogRepository {
             }
         }
 
-        val allEntries = mutableListOf<MediaEntry>()
+        val allEntries = Collections.synchronizedList(mutableListOf<MediaEntry>())
         allEntries.addAll(curatedSeries)
 
-        val distinctList = allEntries.distinctBy { it.url }
+        coroutineScope {
+            val seriesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, SERIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.SERIES, sourceLabel = "Series TV")
+                    parsed.map { entry ->
+                        val clean = M3uParser.cleanChannelTitle(entry.title)
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(
+                            title = clean,
+                            type = Kind.SERIES,
+                            isVod = true,
+                            quality = qual,
+                            genre = if (entry.genre.isNotBlank()) entry.genre else "Drama",
+                            description = if (entry.description.isNotBlank()) entry.description else "Episodic television broadcast on demand."
+                        )
+                    }
+                } else emptyList()
+            }
+
+            val animationTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, ANIMATION_SERIES_PLAYLIST)
+                if (body.isNotBlank()) {
+                    val parsed = M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.SERIES, sourceLabel = "Animation TV")
+                    parsed.map { entry ->
+                        val clean = M3uParser.cleanChannelTitle(entry.title)
+                        val qual = if (entry.quality.isNotBlank() && entry.quality != "1080p") entry.quality else detectQuality(entry.title, "1080p")
+                        entry.copy(
+                            title = clean,
+                            type = Kind.SERIES,
+                            isVod = true,
+                            quality = qual,
+                            genre = "Animation",
+                            description = if (entry.description.isNotBlank()) entry.description else "Animated series broadcast on demand."
+                        )
+                    }
+                } else emptyList()
+            }
+
+            allEntries.addAll(seriesTask.await())
+            allEntries.addAll(animationTask.await())
+        }
+
+        val distinctList = allEntries.toList().distinctBy { it.url }
         cachedSeriesChannels = distinctList
-        if (context != null) {
+        if (context != null && distinctList.isNotEmpty()) {
             saveToDiskCache(context, "series", distinctList)
         }
         distinctList
@@ -704,7 +748,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/BBC_News_2022.svg/320px-BBC_News_2022.svg.png",
             description = "24-hour news and current affairs from the British Broadcasting Corporation in Full HD.",
-            source = "BBC Broadcast"
+            source = "BBC Broadcast",
+            tvgId = "BBCNews.uk"
         ),
         MediaEntry(
             id = "uk-sky-news-hd",
@@ -715,7 +760,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/en/thumb/9/90/Sky_News_logo_2020.svg/320px-Sky_News_logo_2020.svg.png",
             description = "Live breaking news, video, analysis and headline reports from the UK and around the world.",
-            source = "Sky UK"
+            source = "Sky UK",
+            tvgId = "SkyNews.uk"
         ),
         MediaEntry(
             id = "uk-bloomberg-hd",
@@ -726,7 +772,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Bloomberg_Television_logo.svg/320px-Bloomberg_Television_logo.svg.png",
             description = "Global business and financial news, stock market updates, and economic reports.",
-            source = "Bloomberg"
+            source = "Bloomberg",
+            tvgId = "BloombergTV.us"
         ),
         MediaEntry(
             id = "uk-euronews-hd",
@@ -737,7 +784,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Euronews_2016_logo.svg/320px-Euronews_2016_logo.svg.png",
             description = "All the latest international headlines, European perspective and in-depth reporting.",
-            source = "Euronews"
+            source = "Euronews",
+            tvgId = "Euronews.fr"
         ),
         MediaEntry(
             id = "uk-france24-en",
@@ -748,7 +796,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/France_24_logo.svg/320px-France_24_logo.svg.png",
             description = "International news 24/7 with a European and French perspective.",
-            source = "France Medias Monde"
+            source = "France Medias Monde",
+            tvgId = "France24English.fr"
         ),
         MediaEntry(
             id = "uk-dw-english",
@@ -759,7 +808,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Deutsche_Welle_logo.svg/320px-Deutsche_Welle_logo.svg.png",
             description = "Deutsche Welle international broadcast channel delivering news, culture, and science.",
-            source = "Deutsche Welle"
+            source = "Deutsche Welle",
+            tvgId = "DWEnglish.de"
         ),
         MediaEntry(
             id = "uk-redbull-tv",
@@ -770,7 +820,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Red_Bull_TV_logo.svg/320px-Red_Bull_TV_logo.svg.png",
             description = "Action sports, live events, music festivals, documentaries and inspiring films.",
-            source = "Red Bull Media House"
+            source = "Red Bull Media House",
+            tvgId = "RedBullTV.at"
         ),
         MediaEntry(
             id = "uk-nasa-tv-hd",
@@ -781,7 +832,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e5/NASA_logo.svg/320px-NASA_logo.svg.png",
             description = "Live views from the International Space Station, rocket launches, and space missions.",
-            source = "NASA"
+            source = "NASA",
+            tvgId = "NASATVMedia.us"
         ),
         MediaEntry(
             id = "uk-reuters-live",
@@ -792,7 +844,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Reuters_Logo.svg/320px-Reuters_Logo.svg.png",
             description = "Real-time global news reporting from journalists stationed worldwide.",
-            source = "Thomson Reuters"
+            source = "Thomson Reuters",
+            tvgId = "ReutersNow.us"
         ),
         MediaEntry(
             id = "us-abc-news-live",
@@ -803,7 +856,8 @@ object CatalogRepository {
             country = "USA",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2a/ABC_News_logo_2021.svg/320px-ABC_News_logo_2021.svg.png",
             description = "24/7 streaming news from ABC News featuring live breaking news and special reports.",
-            source = "ABC News"
+            source = "ABC News",
+            tvgId = "ABCNewsLive.us"
         ),
         MediaEntry(
             id = "us-cbs-news-live",
@@ -814,7 +868,8 @@ object CatalogRepository {
             country = "USA",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/19/CBS_News_logo_2020.svg/320px-CBS_News_logo_2020.svg.png",
             description = "Live news broadcasts, original reporting and analysis from CBS News journalists.",
-            source = "Paramount Global"
+            source = "Paramount Global",
+            tvgId = "CBSNews.us"
         ),
         MediaEntry(
             id = "us-live-now-fox",
@@ -825,7 +880,8 @@ object CatalogRepository {
             country = "USA",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c0/LiveNOW_from_Fox_logo.svg/320px-LiveNOW_from_Fox_logo.svg.png",
             description = "Raw, unfiltered live breaking news events from across the United States.",
-            source = "FOX Television Stations"
+            source = "FOX Television Stations",
+            tvgId = "LiveNOWfromFOX.us"
         ),
         MediaEntry(
             id = "us-weather-nation",
@@ -836,7 +892,8 @@ object CatalogRepository {
             country = "USA",
             logo = "https://upload.wikimedia.org/wikipedia/en/thumb/e/e0/WeatherNation_logo.svg/320px-WeatherNation_logo.svg.png",
             description = "Continuous live weather radar, forecasts and severe weather storm coverage.",
-            source = "WeatherNation"
+            source = "WeatherNation",
+            tvgId = "WeatherNation.us"
         )
     )
 
@@ -850,7 +907,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/en/thumb/9/90/Sky_News_logo_2020.svg/320px-Sky_News_logo_2020.svg.png",
             description = "Live breaking news, UK national stories, political reports, and global headlines.",
-            source = "Sky Network"
+            source = "Sky Network",
+            tvgId = "SkyNews.uk"
         ),
         MediaEntry(
             id = "sky-bbc-news-fhd",
@@ -861,7 +919,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/62/BBC_News_2022.svg/320px-BBC_News_2022.svg.png",
             description = "24-hour BBC News broadcast live in Full HD.",
-            source = "BBC Network"
+            source = "BBC Network",
+            tvgId = "BBCNews.uk"
         ),
         MediaEntry(
             id = "sky-bloomberg-europe",
@@ -872,7 +931,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5a/Bloomberg_Television_logo.svg/320px-Bloomberg_Television_logo.svg.png",
             description = "European markets, financial analytics, stock trends, and economic reports.",
-            source = "Bloomberg Network"
+            source = "Bloomberg Network",
+            tvgId = "BloombergTV.us"
         ),
         MediaEntry(
             id = "sky-euronews-world",
@@ -883,7 +943,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/4/4c/Euronews_2016_logo.svg/320px-Euronews_2016_logo.svg.png",
             description = "International news and European stories delivered 24/7.",
-            source = "Euronews"
+            source = "Euronews",
+            tvgId = "Euronews.fr"
         ),
         MediaEntry(
             id = "sky-france24-english",
@@ -894,7 +955,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/82/France_24_logo.svg/320px-France_24_logo.svg.png",
             description = "International perspectives and breaking world headlines.",
-            source = "France 24"
+            source = "France 24",
+            tvgId = "France24English.fr"
         ),
         MediaEntry(
             id = "sky-dw-english",
@@ -905,7 +967,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Deutsche_Welle_logo.svg/320px-Deutsche_Welle_logo.svg.png",
             description = "Deutsche Welle documentary features, science, and world analysis.",
-            source = "Deutsche Welle"
+            source = "Deutsche Welle",
+            tvgId = "DWEnglish.de"
         ),
         MediaEntry(
             id = "sky-reuters-tv",
@@ -916,7 +979,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8d/Reuters_Logo.svg/320px-Reuters_Logo.svg.png",
             description = "Direct news feeds from journalists around the globe.",
-            source = "Thomson Reuters"
+            source = "Thomson Reuters",
+            tvgId = "ReutersNow.us"
         ),
         MediaEntry(
             id = "sky-redbull-tv",
@@ -927,7 +991,8 @@ object CatalogRepository {
             country = "UK",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Red_Bull_TV_logo.svg/320px-Red_Bull_TV_logo.svg.png",
             description = "Extreme sports, world championships, motorsports, and music festivals.",
-            source = "Red Bull"
+            source = "Red Bull",
+            tvgId = "RedBullTV.at"
         )
     )
 

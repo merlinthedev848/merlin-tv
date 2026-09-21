@@ -14,7 +14,18 @@ class NetworkMonitor(context: Context) {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
 
+    fun isCurrentlyConnected(): Boolean {
+        val manager = connectivityManager ?: return true
+        val activeNetwork = manager.activeNetwork ?: return false
+        val capabilities = manager.getNetworkCapabilities(activeNetwork) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+    }
+
     val isOnline: Flow<Boolean> = callbackFlow {
+        val initialStatus = isCurrentlyConnected()
+        trySend(initialStatus)
+
         val callback = object : ConnectivityManager.NetworkCallback() {
             override fun onAvailable(network: Network) {
                 trySend(true)
@@ -40,20 +51,8 @@ class NetworkMonitor(context: Context) {
 
         connectivityManager?.registerNetworkCallback(request, callback)
 
-        // Send initial state
-        val currentConnected = isCurrentlyConnected()
-        trySend(currentConnected)
-
         awaitClose {
             connectivityManager?.unregisterNetworkCallback(callback)
         }
     }.distinctUntilChanged()
-
-    fun isCurrentlyConnected(): Boolean {
-        val manager = connectivityManager ?: return true
-        val activeNetwork = manager.activeNetwork ?: return false
-        val capabilities = manager.getNetworkCapabilities(activeNetwork) ?: return false
-        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
-               capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
-    }
 }

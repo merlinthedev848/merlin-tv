@@ -11,7 +11,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.merlinmedia.data.CatalogRepository
 import com.example.merlinmedia.data.FavoritesManager
 import com.example.merlinmedia.data.NetworkMonitor
@@ -47,6 +46,11 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        favoritesManager.close()
+    }
 }
 
 @Composable
@@ -56,7 +60,7 @@ fun MerlinTvApp(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val isOnline by networkMonitor.isOnline.collectAsState(initial = true)
+    val isOnline by networkMonitor.isOnline.collectAsState(initial = networkMonitor.isCurrentlyConnected())
 
     var liveChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
     var plutoChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
@@ -88,16 +92,16 @@ fun MerlinTvApp(
     LaunchedEffect(Unit) {
         loadChannels()
 
-        // Silent background update check
+        // Background update check
         coroutineScope.launch(Dispatchers.IO) {
-            val updateResult = UpdateManager.checkForUpdates()
+            val updateResult = UpdateManager.checkForUpdates(context)
             updateResult.onSuccess { info ->
                 if (info != null) {
                     withContext(Dispatchers.Main) {
                         availableUpdate = info
                         Toast.makeText(
                             context,
-                            "Merlin TV update v${info.version} available! Tap 'Update' to install.",
+                            "Merlin TV update v${info.version} available! Open Settings/Updates to install.",
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -106,9 +110,15 @@ fun MerlinTvApp(
         }
     }
 
+    // Auto-reload when connection is restored if lists are empty
+    LaunchedEffect(isOnline) {
+        if (isOnline && (liveChannels.isEmpty() && plutoChannels.isEmpty() && skyChannels.isEmpty())) {
+            loadChannels(forceRefresh = true)
+        }
+    }
+
     // Main navigation router
     if (selectedItem != null) {
-        // Player bypasses splash entirely
         PlayerScreen(
             initialItem = selectedItem!!,
             playlist = activePlaylist.ifEmpty { listOf(selectedItem!!) },
@@ -116,12 +126,10 @@ fun MerlinTvApp(
             onBack = { selectedItem = null }
         )
     } else {
-        // Show wizard splash only on cold start (channels not yet loaded)
         val showSplash = isLoading && liveChannels.isEmpty() && plutoChannels.isEmpty() && skyChannels.isEmpty() && movieChannels.isEmpty()
         AnimatedContent(
             targetState = showSplash,
             transitionSpec = {
-                // Splash fades out slowly; home screen fades in
                 fadeIn(animationSpec = tween(600)) togetherWith
                     fadeOut(animationSpec = tween(400))
             },

@@ -20,10 +20,20 @@ android {
         create("merlinSigning") {
             val ksFile = rootProject.file("keystore/merlin.jks")
             if (ksFile.exists()) {
+                val storePass = System.getenv("MERLIN_KEYSTORE_PASSWORD") 
+                    ?: (project.findProperty("MERLIN_KEYSTORE_PASSWORD") as? String) 
+                    ?: "merlinpassword123"
+                val keyAliasVal = System.getenv("MERLIN_KEY_ALIAS") 
+                    ?: (project.findProperty("MERLIN_KEY_ALIAS") as? String) 
+                    ?: "merlin"
+                val keyPass = System.getenv("MERLIN_KEY_PASSWORD") 
+                    ?: (project.findProperty("MERLIN_KEY_PASSWORD") as? String) 
+                    ?: "merlinpassword123"
+
                 storeFile = ksFile
-                storePassword = "merlinpassword123"
-                keyAlias = "merlin"
-                keyPassword = "merlinpassword123"
+                storePassword = storePass
+                keyAlias = keyAliasVal
+                keyPassword = keyPass
                 enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true
@@ -94,5 +104,6 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    testImplementation("junit:junit:4.13.2")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

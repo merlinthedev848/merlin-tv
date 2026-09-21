@@ -14,11 +14,9 @@ object M3uParser {
     private val DEAD_OR_BLOCKED_MARKERS = listOf(
         "[geo-blocked]",
         "[geoblocked]",
-        "[geo]",
         "[offline]",
         "[dead]",
         "[blocked]",
-        "[not 24/7]",
         "[offline/dead]",
         "[no stream]"
     )
@@ -35,6 +33,9 @@ object M3uParser {
         "tiktok.com"
     )
 
+    private val QUALITY_TAG_REGEX = Regex("""\s*[\(\[]\s*(\d{3,4}p|\d+fps|4k|uhd|fhd|hd|sd|hevc|h264|h265)\s*[\)\]]""", RegexOption.IGNORE_CASE)
+    private val BRACKET_TAG_REGEX = Regex("""\s*\[[^\]]*\]""")
+
     fun normalizeCountry(raw: String): String {
         val trimmed = raw.trim().uppercase()
         return when (trimmed) {
@@ -48,6 +49,14 @@ object M3uParser {
             "IT", "ITA", "ITALY" -> "Italy"
             else -> raw.trim()
         }
+    }
+
+    fun cleanChannelTitle(raw: String): String {
+        return raw
+            .replace(QUALITY_TAG_REGEX, "")
+            .replace(BRACKET_TAG_REGEX, "")
+            .replace(Regex("""\s+"""), " ")
+            .trim()
     }
 
     fun parse(
@@ -93,6 +102,10 @@ object M3uParser {
                 } else {
                     TVG_NAME_REGEX.find(line)?.groupValues?.getOrNull(1)?.trim().orEmpty().ifBlank { "Channel" }
                 }
+            } else if (line.startsWith("#EXTGRP:", ignoreCase = true)) {
+                if (currentGroup.isBlank()) {
+                    currentGroup = line.substringAfter(":").trim()
+                }
             } else if (
                 line.startsWith("http://", ignoreCase = true) ||
                 line.startsWith("https://", ignoreCase = true) ||
@@ -125,14 +138,7 @@ object M3uParser {
                         else -> "1080p"
                     }
 
-                    // Clean title: remove any leftover bracket artifacts
-                    val cleanTitle = currentTitle
-                        .replace(Regex("""\[.*?\]"""), "")
-                        .replace(Regex("""\(.*?\)"""), "")
-                        .replace(Regex("""\s+"""), " ")
-                        .trim()
-                        .ifBlank { "Channel ${entries.size + 1}" }
-
+                    val cleanTitle = cleanChannelTitle(currentTitle).ifBlank { "Channel ${entries.size + 1}" }
                     val entryId = if (currentId.isNotBlank()) currentId else "$cleanTitle-$line".hashCode().toString()
 
                     entries.add(
@@ -145,7 +151,8 @@ object M3uParser {
                             group = currentGroup.ifBlank { "General" },
                             logo = currentLogo,
                             source = sourceLabel,
-                            quality = parsedQuality
+                            quality = parsedQuality,
+                            tvgId = currentId
                         )
                     )
                 }

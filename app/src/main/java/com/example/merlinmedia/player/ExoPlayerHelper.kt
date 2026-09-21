@@ -4,17 +4,16 @@ import android.content.Context
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MediaMetadata
+import androidx.media3.common.PlaybackParameters
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 
-import androidx.media3.common.MediaMetadata
-
 object ExoPlayerHelper {
 
     fun createPlayer(context: Context, lowLatencyMode: Boolean = true): ExoPlayer {
-        // Optimized buffer parameters for IPTV and low-memory TV boxes
         val minBufferMs = if (lowLatencyMode) 2500 else 5000
         val maxBufferMs = if (lowLatencyMode) 15000 else 30000
         val playbackStartBufferMs = if (lowLatencyMode) 1500 else 2500
@@ -52,6 +51,10 @@ object ExoPlayerHelper {
             .apply {
                 playWhenReady = true
             }
+    }
+
+    fun setPlaybackSpeed(player: ExoPlayer, speed: Float) {
+        player.playbackParameters = PlaybackParameters(speed.coerceIn(0.25f, 3.0f))
     }
 
     fun buildMediaItem(url: String, title: String): MediaItem {

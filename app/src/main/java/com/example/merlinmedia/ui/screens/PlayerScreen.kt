@@ -46,6 +46,7 @@ import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.player.ExoPlayerHelper
 import com.example.merlinmedia.ui.components.*
+import com.example.merlinmedia.ui.dialogs.SleepTimerDialog
 import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -64,13 +65,17 @@ fun PlayerScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showControls by remember { mutableStateOf(true) }
     var showMiniGuide by remember { mutableStateOf(false) }
+    var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var sleepTimerRemainingMinutes by remember { mutableIntStateOf(0) }
+    var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
     var miniGuideSearch by remember { mutableStateOf("") }
     var aspectMode by remember { mutableStateOf(AspectRatioMode.FIT) }
-    // Fix #2: don't initialise once from initialItem — derive from currentItem on every change
-    var isFavorite by remember { mutableStateOf(false) }
     var reconnectAttempt by remember { mutableIntStateOf(0) }
     var isAutoReconnecting by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+
+    val favoriteIds by favoritesManager.favoriteIds.collectAsState()
+    val isFavorite = favoriteIds.contains(currentItem.id)
 
     val currentIndex = remember(currentItem, playlist) {
         val idx = playlist.indexOfFirst { it.url == currentItem.url }
@@ -87,17 +92,29 @@ fun PlayerScreen(
     }
 
     // Auto-hide controls after 5 seconds if mini guide is not open
-    LaunchedEffect(showControls, isPlaying, showMiniGuide) {
-        if (showControls && isPlaying && errorMessage == null && !showMiniGuide && !isAutoReconnecting) {
+    LaunchedEffect(showControls, isPlaying, showMiniGuide, showSleepTimerDialog) {
+        if (showControls && isPlaying && errorMessage == null && !showMiniGuide && !showSleepTimerDialog && !isAutoReconnecting) {
             delay(5000)
             showControls = false
         }
     }
 
-    // Record to recent history and sync isFavorite immediately on channel change
+    // Sleep Timer countdown ticker
+    LaunchedEffect(sleepTimerRemainingMinutes) {
+        if (sleepTimerRemainingMinutes > 0) {
+            while (sleepTimerRemainingMinutes > 0) {
+                delay(60_000L)
+                sleepTimerRemainingMinutes -= 1
+                if (sleepTimerRemainingMinutes <= 0) {
+                    isPlaying = false
+                }
+            }
+        }
+    }
+
+    // Record to recent history immediately on channel change
     LaunchedEffect(currentItem) {
         favoritesManager.addToRecent(currentItem)
-        isFavorite = favoritesManager.isFavorite(currentItem.id)
     }
 
     // Initialize ExoPlayer via ExoPlayerHelper
@@ -116,6 +133,7 @@ fun PlayerScreen(
         player.stop()
         player.clearMediaItems()
         player.setMediaItem(ExoPlayerHelper.buildMediaItem(item.url, item.title))
+        ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
         player.prepare()
         player.playWhenReady = true
     }
@@ -181,7 +199,9 @@ fun PlayerScreen(
 
     // Multi-level Back Handler
     BackHandler {
-        if (showMiniGuide) {
+        if (showSleepTimerDialog) {
+            showSleepTimerDialog = false
+        } else if (showMiniGuide) {
             showMiniGuide = false
         } else if (showControls) {
             showControls = false
@@ -207,15 +227,9 @@ fun PlayerScreen(
                         }
                         KeyEvent.KEYCODE_DPAD_UP -> {
                             when {
-                                // Fix #6: Only jump straight to mini guide when OSD is already hidden.
-                                // If controls are visible, first close them (next UP press opens guide).
                                 !showMiniGuide && !showControls -> {
                                     showMiniGuide = true
                                     true
-                                }
-                                !showMiniGuide && showControls -> {
-                                    // Let focus navigate within OSD; don't intercept
-                                    false
                                 }
                                 else -> false
                             }
@@ -282,11 +296,6 @@ fun PlayerScreen(
                         ViewGroup.LayoutParams.MATCH_PARENT,
                         ViewGroup.LayoutParams.MATCH_PARENT
                     )
-                    resizeMode = when (aspectMode) {
-                        AspectRatioMode.FIT -> AspectRatioFrameLayout.RESIZE_MODE_FIT
-                        AspectRatioMode.ZOOM -> AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                        AspectRatioMode.STRETCH -> AspectRatioFrameLayout.RESIZE_MODE_FILL
-                    }
                 }
             },
             update = { view ->
@@ -322,7 +331,7 @@ fun PlayerScreen(
                             modifier = Modifier.size(24.dp)
                         )
                         Text(
-                            text = if (isAutoReconnecting) "Reconnecting stream (Attempt $reconnectAttempt of 3)..." else "Loading Stream...",
+                            text = if (isAutoReconnecting) "Reconnecting stream (Attempt $reconnectAttempt of 3)..." else "Buffering stream...",
                             color = TextPrimary,
                             fontWeight = FontWeight.SemiBold,
                             style = MaterialTheme.typography.bodyMedium
@@ -397,7 +406,7 @@ fun PlayerScreen(
             }
         }
 
-        // Solid, Clean On-Screen Display (OSD)
+        // On-Screen Display (OSD)
         AnimatedVisibility(
             visible = showControls && !showMiniGuide,
             enter = fadeIn(animationSpec = tween(150)),
@@ -471,6 +480,30 @@ fun PlayerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            // Sleep Timer Indicator/Button
+                            Button(
+                                onClick = { showSleepTimerDialog = true },
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (sleepTimerRemainingMinutes > 0) AccentGold.copy(alpha = 0.2f) else CardSurface
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, if (sleepTimerRemainingMinutes > 0) AccentGold else BorderSubtle)
+                            ) {
+                                Icon(
+                                    Icons.Default.Bedtime,
+                                    contentDescription = "Sleep Timer",
+                                    tint = if (sleepTimerRemainingMinutes > 0) AccentGold else TextSecondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = if (sleepTimerRemainingMinutes > 0) "${sleepTimerRemainingMinutes}m" else "Sleep Timer",
+                                    color = if (sleepTimerRemainingMinutes > 0) AccentGold else TextPrimary,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
                             // Mini Guide Toggle Button
                             Button(
                                 onClick = { showMiniGuide = true },
@@ -480,14 +513,13 @@ fun PlayerScreen(
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Channel Guide", tint = AccentSky, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Channel Guide", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                                Text("Guide", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                             }
 
                             // Favorite Button
                             IconButton(
                                 onClick = {
-                                    val newState = favoritesManager.toggleFavorite(currentItem.id)
-                                    isFavorite = newState
+                                    favoritesManager.toggleFavorite(currentItem.id)
                                 },
                                 modifier = Modifier
                                     .size(40.dp)
@@ -520,7 +552,7 @@ fun PlayerScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Channel Surfing Controls
+                        // Play/Pause and Skip Controls
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -579,11 +611,29 @@ fun PlayerScreen(
                             }
                         }
 
-                        // Info & Aspect Ratio
+                        // Playback Speed (for VOD items) and Aspect Ratio
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
+                            if (currentItem.isVod) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val speeds = listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+                                        val nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.size
+                                        playbackSpeed = speeds[nextIdx]
+                                        ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
+                                    },
+                                    shape = RoundedCornerShape(8.dp),
+                                    border = BorderStroke(1.dp, BorderSubtle),
+                                    colors = ButtonDefaults.outlinedButtonColors(containerColor = CardSurface, contentColor = TextPrimary)
+                                ) {
+                                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("${playbackSpeed}x", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+
                             if (playlist.size > 1) {
                                 Text(
                                     text = "Channel ${currentIndex + 1} of ${playlist.size}",
@@ -615,7 +665,7 @@ fun PlayerScreen(
             }
         }
 
-        // Semi-Transparent Glass Quick Channel Guide Drawer
+        // Quick Channel Guide Drawer
         AnimatedVisibility(
             visible = showMiniGuide,
             enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(animationSpec = tween(200)),
@@ -652,7 +702,7 @@ fun PlayerScreen(
                                 Icon(Icons.Default.LiveTv, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
                             Text(
-                                text = "Quick Channel Guide",
+                                text = "Channel Guide",
                                 style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.Bold,
                                 color = TextPrimary
@@ -690,8 +740,7 @@ fun PlayerScreen(
                                 isCurrentPlaying = item.id == currentItem.id || item.url == currentItem.url,
                                 isFavorite = favoritesManager.isFavorite(item.id),
                                 onToggleFavorite = {
-                                    val newState = favoritesManager.toggleFavorite(item.id)
-                                    if (item.id == currentItem.id) isFavorite = newState
+                                    favoritesManager.toggleFavorite(item.id)
                                 },
                                 onClick = {
                                     playItem(item)
@@ -702,6 +751,17 @@ fun PlayerScreen(
                     }
                 }
             }
+        }
+
+        // Sleep Timer Dialog
+        if (showSleepTimerDialog) {
+            SleepTimerDialog(
+                currentRemainingMinutes = sleepTimerRemainingMinutes,
+                onSetTimer = { mins ->
+                    sleepTimerRemainingMinutes = mins
+                },
+                onDismiss = { showSleepTimerDialog = false }
+            )
         }
     }
 }

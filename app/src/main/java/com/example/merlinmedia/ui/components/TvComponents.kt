@@ -23,18 +23,18 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import coil.compose.AsyncImage
+import com.example.merlinmedia.data.EpgRepository
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.ui.theme.*
@@ -178,7 +178,6 @@ fun HeroFeatureBanner(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // CTA Action Pill Button
                 Button(
                     onClick = onActionClick,
                     interactionSource = interactionSource,
@@ -210,12 +209,14 @@ fun HeroFeatureBanner(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    for (i in 0 until totalDots) {
+                    val safeTotal = totalDots.coerceAtLeast(1)
+                    val safeActive = activeDotIndex.coerceIn(0, safeTotal - 1)
+                    for (i in 0 until safeTotal) {
                         Box(
                             modifier = Modifier
-                                .size(if (i == activeDotIndex) 8.dp else 6.dp)
-                                .clip(androidx.compose.foundation.shape.CircleShape)
-                                .background(if (i == activeDotIndex) AccentSky else Color(0xFF334155))
+                                .size(if (i == safeActive) 8.dp else 6.dp)
+                                .clip(CircleShape)
+                                .background(if (i == safeActive) AccentSky else Color(0xFF334155))
                         )
                     }
                 }
@@ -247,7 +248,10 @@ fun HubShortcutCard(
 
     Card(
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .height(76.dp)
             .clip(RoundedCornerShape(12.dp))
             .background(Brush.horizontalGradient(gradientColors))
@@ -271,9 +275,9 @@ fun HubShortcutCard(
             Box(
                 modifier = Modifier
                     .size(36.dp)
-                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .clip(CircleShape)
                     .background(Color.Black.copy(alpha = 0.35f))
-                    .border(1.dp, Color.White.copy(alpha = 0.2f), androidx.compose.foundation.shape.CircleShape),
+                    .border(1.dp, Color.White.copy(alpha = 0.2f), CircleShape),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -309,8 +313,7 @@ fun HubShortcutCard(
 }
 
 /**
- * Sleek, compact Header Details Bar with EPG 'Now & Next' timeline.
- * Takes up minimal vertical space (~64dp) leaving maximum room for channel browsing.
+ * Sleek Header Details Bar with real XMLTV EPG data when available (fallback to clock).
  */
 @Composable
 fun FocusedChannelHeaderBar(
@@ -321,20 +324,21 @@ fun FocusedChannelHeaderBar(
 ) {
     if (item == null) return
 
-    // Derive realistic simulated EPG air time & program details based on current clock & channel name
+    val epgPair = remember(item.tvgId, item.title) {
+        EpgRepository.getNowAndNext(item.tvgId, item.title)
+    }
+
     val calendar = java.util.Calendar.getInstance()
     val minuteOfHour = calendar.get(java.util.Calendar.MINUTE)
     val hourOfDay = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-    val progress = (minuteOfHour / 60f).coerceIn(0.05f, 0.95f)
-    val minsLeft = 60 - minuteOfHour
-    val startTime = String.format("%02d:00", hourOfDay)
-    val endTime = String.format("%02d:00", (hourOfDay + 1) % 24)
+    val fallbackProgress = (minuteOfHour / 60f).coerceIn(0.05f, 0.95f)
+    val fallbackStartTime = String.format("%02d:00", hourOfDay)
+    val fallbackEndTime = String.format("%02d:00", (hourOfDay + 1) % 24)
 
-    val isFhd = item.title.contains("1080", ignoreCase = true) || item.title.contains("FHD", ignoreCase = true) || item.group.contains("NEWS", ignoreCase = true) || item.group.contains("SPORTS", ignoreCase = true)
-    val is4k = item.title.contains("4K", ignoreCase = true) || item.title.contains("UHD", ignoreCase = true)
-
-    val currentProgram = if (item.description.isNotBlank()) item.description else "Live Broadcast: ${item.title}"
-    val nextProgram = "Up Next ($endTime): Featured ${if (item.group.isNotBlank()) item.group.substringAfter("|").trim() else "Programming"}"
+    val currentProgram = epgPair?.first?.title ?: if (item.description.isNotBlank()) item.description else "Live Broadcast: ${item.title}"
+    val startTime = epgPair?.first?.startFormatted?.ifBlank { null } ?: fallbackStartTime
+    val endTime = epgPair?.first?.stopFormatted?.ifBlank { null } ?: fallbackEndTime
+    val progress = epgPair?.first?.progress ?: fallbackProgress
 
     Card(
         modifier = modifier
@@ -352,13 +356,12 @@ fun FocusedChannelHeaderBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Left: Channel Logo or Initial Badge + Info Details
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                // Compact Logo / Badge
+                // Logo Badge
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -391,7 +394,6 @@ fun FocusedChannelHeaderBar(
                     }
                 }
 
-                // Channel Info Title, Tags, and EPG Progress Bar
                 Column(
                     verticalArrangement = Arrangement.Center,
                     modifier = Modifier.weight(1f)
@@ -427,8 +429,7 @@ fun FocusedChannelHeaderBar(
                             }
                         }
 
-                        // Quality Badge
-                        QualityBadge(quality = item.quality.ifBlank { if (is4k) "4K" else if (isFhd) "1080p" else "720p" })
+                        QualityBadge(quality = item.quality.ifBlank { "1080p" })
 
                         if (item.country.isNotBlank()) {
                             Text(
@@ -453,7 +454,6 @@ fun FocusedChannelHeaderBar(
                             fontWeight = FontWeight.SemiBold
                         )
 
-                        // Air Time Progress Bar
                         Box(
                             modifier = Modifier
                                 .width(80.dp)
@@ -470,7 +470,7 @@ fun FocusedChannelHeaderBar(
                         }
 
                         Text(
-                            text = "${minsLeft}m left  ·  $currentProgram",
+                            text = currentProgram,
                             color = TextSecondary,
                             fontSize = 11.sp,
                             maxLines = 1,
@@ -483,7 +483,6 @@ fun FocusedChannelHeaderBar(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            // Right: Watch Fullscreen Button
             Button(
                 onClick = onWatchClick,
                 colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue),
@@ -540,12 +539,7 @@ fun QualityBadge(quality: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * Modern Wide 16:9 Channel Tile.
- * Optimized for Android TV D-Pad navigation:
- * - Shows clear channel number + favorite star
- * - Center prominent channel brand logo (with sleek fallback badge)
- * - Display stream quality badge (720p / 1080p / 4k) directly in the box
- * - Channel title and non-wrapping LIVE badge
+ * Modern Wide 16:9 Channel Tile with hardware-accelerated graphicsLayer scale.
  */
 @Composable
 fun ChannelGridCard(
@@ -580,7 +574,10 @@ fun ChannelGridCard(
 
     Card(
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .height(116.dp)
             .border(if (isFocused) 2.5.dp else 1.dp, borderColor, RoundedCornerShape(10.dp))
             .clip(RoundedCornerShape(10.dp))
@@ -596,7 +593,7 @@ fun ChannelGridCard(
                 .padding(horizontal = 9.dp, vertical = 7.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Header: Channel Number on left, Quality Badge & Favorite Star on right
+            // Header: Channel Number & Favorite
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -636,7 +633,7 @@ fun ChannelGridCard(
                 }
             }
 
-            // Center: Channel Branding / Logo
+            // Channel Logo / Brand Icon
             val logoBgModifier = if (!item.logo.isNullOrBlank()) {
                 Modifier.background(Color(0xFF090D15))
             } else {
@@ -869,7 +866,6 @@ fun QuickChannelDrawerItem(
             }
         }
 
-        // Right side indicators: Quality badge / Playing icon / Favorite
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -921,13 +917,15 @@ fun VodMovieCard(
 
     Column(
         modifier = modifier
-            .scale(scale)
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .width(150.dp)
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        // Poster Box (2:3 Aspect Ratio)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -963,7 +961,7 @@ fun VodMovieCard(
                 }
             }
 
-            // Top Badges (Year & Rating)
+            // Top Badges
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -993,7 +991,7 @@ fun VodMovieCard(
                 }
             }
 
-            // Bottom Gradient & Duration / Genre Pill
+            // Bottom Gradient
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1012,7 +1010,6 @@ fun VodMovieCard(
             }
         }
 
-        // Title below poster
         Text(
             text = item.title,
             color = if (isFocused) Color.White else TextPrimary,
@@ -1025,7 +1022,7 @@ fun VodMovieCard(
 }
 
 /**
- * Movie VOD Details Modal (Overview, Cast/Genre, Year, Duration, Direct Play)
+ * Movie VOD Details Modal
  */
 @Composable
 fun VodDetailsDialog(
@@ -1045,7 +1042,6 @@ fun VodDetailsDialog(
                 .border(1.5.dp, AccentSky.copy(alpha = 0.5f), RoundedCornerShape(16.dp))
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top Backdrop Banner
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -1075,14 +1071,12 @@ fun VodDetailsDialog(
                     }
                 }
 
-                // Details Content
                 Row(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(horizontal = 24.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(20.dp)
                 ) {
-                    // Vertical Poster on left
                     Box(
                         modifier = Modifier
                             .width(130.dp)
@@ -1098,7 +1092,6 @@ fun VodDetailsDialog(
                         )
                     }
 
-                    // Metadata & Actions on right
                     Column(
                         modifier = Modifier
                             .weight(1f)
@@ -1112,7 +1105,6 @@ fun VodDetailsDialog(
                             color = Color.White
                         )
 
-                        // Info row: Year, Duration, Rating, Genre
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -1145,7 +1137,6 @@ fun VodDetailsDialog(
                             }
                         }
 
-                        // Synopsis
                         Text(
                             text = if (item.description.isNotBlank()) item.description else "Stream this full feature release in high quality directly on Merlin TV.",
                             color = Color(0xFFCBD5E1),
@@ -1155,7 +1146,6 @@ fun VodDetailsDialog(
 
                         Spacer(modifier = Modifier.height(6.dp))
 
-                        // Action Buttons: Play Movie & Favorite
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                             verticalAlignment = Alignment.CenterVertically
@@ -1219,7 +1209,6 @@ fun SeriesEpisodeDialog(
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -1238,7 +1227,6 @@ fun SeriesEpisodeDialog(
 
                 Text("Episodes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = TextPrimary)
 
-                // Episode List
                 LazyColumn(
                     modifier = Modifier.weight(1f),
                     verticalArrangement = Arrangement.spacedBy(8.dp)

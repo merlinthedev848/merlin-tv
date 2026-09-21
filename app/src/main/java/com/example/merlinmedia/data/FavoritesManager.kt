@@ -2,16 +2,23 @@ package com.example.merlinmedia.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.Closeable
 
-class FavoritesManager(context: Context) {
+class FavoritesManager(context: Context) : Closeable {
     private val prefs: SharedPreferences = context.getSharedPreferences("merlin_favorites_prefs", Context.MODE_PRIVATE)
-    private val ioScope = CoroutineScope(Dispatchers.IO)
+    private val managerJob = SupervisorJob()
+    private val ioScope = CoroutineScope(Dispatchers.IO + managerJob)
 
     companion object {
         private const val KEY_FAVORITES = "favorite_channel_ids"
@@ -19,94 +26,109 @@ class FavoritesManager(context: Context) {
         private const val MAX_HISTORY = 40
     }
 
-    // High-performance in-memory caches for O(1) instantaneous UI access
-    private val cachedFavoriteIds: MutableSet<String> = HashSet()
-    private val cachedRecentHistory: MutableList<MediaEntry> = ArrayList()
+    private val _favoriteIds = MutableStateFlow<Set<String>>(emptySet())
+    val favoriteIds: StateFlow<Set<String>> = _favoriteIds.asStateFlow()
+
+    private val _recentHistory = MutableStateFlow<List<MediaEntry>>(emptyList())
+    val recentHistory: StateFlow<List<MediaEntry>> = _recentHistory.asStateFlow()
+
     private val lock = Any()
 
     init {
         synchronized(lock) {
-            // Preload favorite IDs
             val storedFavs = prefs.getStringSet(KEY_FAVORITES, emptySet()) ?: emptySet()
-            cachedFavoriteIds.addAll(storedFavs)
+            _favoriteIds.value = HashSet(storedFavs)
 
-            // Preload recent history
             val rawHistory = prefs.getString(KEY_RECENT_HISTORY, null)
             if (!rawHistory.isNullOrBlank()) {
+                val list = mutableListOf<MediaEntry>()
                 runCatching {
                     val jsonArray = JSONArray(rawHistory)
                     for (i in 0 until jsonArray.length()) {
                         val obj = jsonArray.getJSONObject(i)
-                        cachedRecentHistory.add(
+                        list.add(
                             MediaEntry(
                                 id = obj.optString("id"),
                                 title = obj.optString("title"),
                                 url = obj.optString("url"),
-                                type = runCatching { com.example.merlinmedia.model.Kind.valueOf(obj.optString("type")) }.getOrDefault(com.example.merlinmedia.model.Kind.LIVE),
+                                type = runCatching { Kind.valueOf(obj.optString("type")) }.getOrDefault(Kind.LIVE),
                                 country = obj.optString("country"),
                                 group = obj.optString("group"),
                                 logo = obj.optString("logo").ifBlank { null },
                                 description = obj.optString("description"),
-                                source = obj.optString("source")
+                                source = obj.optString("source"),
+                                year = obj.optString("year"),
+                                duration = obj.optString("duration"),
+                                genre = obj.optString("genre"),
+                                rating = obj.optString("rating"),
+                                season = if (obj.has("season")) obj.optInt("season") else null,
+                                episode = if (obj.has("episode")) obj.optInt("episode") else null,
+                                backdrop = obj.optString("backdrop").ifBlank { null },
+                                isVod = obj.optBoolean("isVod", false),
+                                quality = obj.optString("quality", "1080p"),
+                                tvgId = obj.optString("tvgId")
                             )
                         )
                     }
                 }
+                _recentHistory.value = list
             }
         }
     }
 
     fun getFavoriteIds(): Set<String> {
-        synchronized(lock) {
-            return HashSet(cachedFavoriteIds)
-        }
+        return _favoriteIds.value
     }
 
     fun isFavorite(id: String): Boolean {
-        synchronized(lock) {
-            return cachedFavoriteIds.contains(id)
-        }
+        return _favoriteIds.value.contains(id)
     }
 
     fun toggleFavorite(id: String): Boolean {
         val newState: Boolean
-        val snapshot: Set<String>
+        val updated: Set<String>
         synchronized(lock) {
-            if (cachedFavoriteIds.contains(id)) {
-                cachedFavoriteIds.remove(id)
+            val current = HashSet(_favoriteIds.value)
+            if (current.contains(id)) {
+                current.remove(id)
                 newState = false
             } else {
-                cachedFavoriteIds.add(id)
+                current.add(id)
                 newState = true
             }
-            snapshot = HashSet(cachedFavoriteIds)
+            updated = current
+            _favoriteIds.value = updated
         }
-        persistFavoritesAsync(snapshot)
+        persistFavoritesAsync(updated)
         return newState
     }
 
     fun addFavorite(id: String) {
-        val snapshot: Set<String>
+        val updated: Set<String>
         synchronized(lock) {
-            if (cachedFavoriteIds.add(id)) {
-                snapshot = HashSet(cachedFavoriteIds)
+            val current = HashSet(_favoriteIds.value)
+            if (current.add(id)) {
+                updated = current
+                _favoriteIds.value = updated
             } else {
                 return
             }
         }
-        persistFavoritesAsync(snapshot)
+        persistFavoritesAsync(updated)
     }
 
     fun removeFavorite(id: String) {
-        val snapshot: Set<String>
+        val updated: Set<String>
         synchronized(lock) {
-            if (cachedFavoriteIds.remove(id)) {
-                snapshot = HashSet(cachedFavoriteIds)
+            val current = HashSet(_favoriteIds.value)
+            if (current.remove(id)) {
+                updated = current
+                _favoriteIds.value = updated
             } else {
                 return
             }
         }
-        persistFavoritesAsync(snapshot)
+        persistFavoritesAsync(updated)
     }
 
     private fun persistFavoritesAsync(snapshot: Set<String>) {
@@ -116,22 +138,22 @@ class FavoritesManager(context: Context) {
     }
 
     fun addToRecent(entry: MediaEntry) {
-        val snapshot: List<MediaEntry>
+        val updated: List<MediaEntry>
         synchronized(lock) {
-            cachedRecentHistory.removeAll { it.url == entry.url }
-            cachedRecentHistory.add(0, entry)
-            while (cachedRecentHistory.size > MAX_HISTORY) {
-                cachedRecentHistory.removeAt(cachedRecentHistory.size - 1)
+            val current = _recentHistory.value.toMutableList()
+            current.removeAll { it.url == entry.url || (it.id.isNotBlank() && it.id == entry.id) }
+            current.add(0, entry)
+            while (current.size > MAX_HISTORY) {
+                current.removeAt(current.size - 1)
             }
-            snapshot = ArrayList(cachedRecentHistory)
+            updated = current
+            _recentHistory.value = updated
         }
-        persistRecentHistoryAsync(snapshot)
+        persistRecentHistoryAsync(updated)
     }
 
     fun getRecentHistory(): List<MediaEntry> {
-        synchronized(lock) {
-            return ArrayList(cachedRecentHistory)
-        }
+        return _recentHistory.value
     }
 
     private fun persistRecentHistoryAsync(snapshot: List<MediaEntry>) {
@@ -149,11 +171,25 @@ class FavoritesManager(context: Context) {
                         put("logo", item.logo ?: "")
                         put("description", item.description)
                         put("source", item.source)
+                        put("year", item.year)
+                        put("duration", item.duration)
+                        put("genre", item.genre)
+                        put("rating", item.rating)
+                        if (item.season != null) put("season", item.season)
+                        if (item.episode != null) put("episode", item.episode)
+                        put("backdrop", item.backdrop ?: "")
+                        put("isVod", item.isVod)
+                        put("quality", item.quality)
+                        put("tvgId", item.tvgId)
                     }
                     jsonArray.put(obj)
                 }
                 prefs.edit().putString(KEY_RECENT_HISTORY, jsonArray.toString()).apply()
             }
         }
+    }
+
+    override fun close() {
+        managerJob.cancel()
     }
 }
