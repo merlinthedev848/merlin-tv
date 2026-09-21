@@ -1,8 +1,8 @@
 {
-  "version": "1.4.3",
-  "versionCode": 143,
+  "version": "1.5.0",
+  "versionCode": 150,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.4.3",
-  "releaseNotes": "Merlin TV v1.4.3: Added Plex FAST Worldwide Channels, Free-TV Curated Broadcast Feeds, and Plex XMLTV EPG Support.",
-  "publishedAt": "2026-09-20T17:50:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.5.0",
+  "releaseNotes": "Merlin TV v1.5.0: Major overhaul with Real XMLTV EPG now/next guide, Sleep Timer (15-120m), VOD Playback Speed controls (0.75x-2.0x), Recently Watched history row, Offline warning banner with auto-retry, thread-safety fixes, and hardware-accelerated TV focus animations.",
+  "publishedAt": "2026-09-21T09:30:00Z"
 }
