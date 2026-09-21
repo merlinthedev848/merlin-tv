@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -14,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Feed
 import androidx.compose.material.icons.automirrored.filled.Sort
@@ -24,6 +24,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -295,7 +296,8 @@ fun HomeScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(BgDark)
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 20.dp, vertical = 12.dp)
+            .clipToBounds(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         // Offline Warning Banner
@@ -338,7 +340,9 @@ fun HomeScreen(
         // 1. TOP HORIZONTAL NAVIGATION & ACTION BAR
         // ==========================================
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clipToBounds(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -382,7 +386,9 @@ fun HomeScreen(
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
-                modifier = Modifier.horizontalScroll(rememberScrollState())
+                modifier = Modifier
+                    .horizontalScroll(rememberScrollState())
+                    .clipToBounds()
             ) {
                 TopNavBarItem(
                     icon = Icons.Default.Home,
@@ -527,7 +533,9 @@ fun HomeScreen(
         // Expandable Search Bar & Active Sort Indicator
         AnimatedVisibility(visible = showSearchBar) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clipToBounds(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -552,563 +560,388 @@ fun HomeScreen(
         }
 
         // =========================================================
-        // 2. MAIN CONTENT VIEW
+        // 2. MAIN CONTENT VIEW (ISOLATED COLUMN LAYOUTS)
         // =========================================================
         if (activeSection == NavSection.HOME || activeSection == NavSection.HUB) {
-            Column(
+            // Self-contained LazyColumn where each section is an isolated block
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .clipToBounds(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 24.dp)
             ) {
-                // Hero Feature Banner Carousel
+                // Section 1: Hero Feature Banner
                 if (heroSlides.isNotEmpty()) {
-                    val safeIndex = heroSlideIndex.coerceIn(0, heroSlides.size - 1)
-                    val (slideInfo, slideAction) = heroSlides[safeIndex]
+                    item(key = "home_hero_banner") {
+                        val safeIndex = heroSlideIndex.coerceIn(0, heroSlides.size - 1)
+                        val (slideInfo, slideAction) = heroSlides[safeIndex]
 
-                    HeroFeatureBanner(
-                        tag = "MerlinTV Feature",
-                        title = slideInfo.second,
-                        subtitle = slideInfo.third,
-                        actionLabel = "Explore ${slideInfo.first}",
-                        activeDotIndex = safeIndex,
-                        totalDots = heroSlides.size,
-                        onActionClick = slideAction
-                    )
+                        HeroFeatureBanner(
+                            tag = "MerlinTV Feature",
+                            title = slideInfo.second,
+                            subtitle = slideInfo.third,
+                            actionLabel = "Explore ${slideInfo.first}",
+                            activeDotIndex = safeIndex,
+                            totalDots = heroSlides.size,
+                            onActionClick = slideAction,
+                            modifier = Modifier.fillMaxWidth().clipToBounds()
+                        )
+                    }
                 }
 
-                // ==========================================
-                // RECENTLY WATCHED ROW
-                // ==========================================
+                // Section 2: Recently Watched Row
                 if (recentHistory.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.History, contentDescription = null, tint = AccentSky, modifier = Modifier.size(20.dp))
-                            Text(
-                                text = "Recently Watched / History",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        }
-                    }
+                    item(key = "home_recently_watched") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clipToBounds(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.History, contentDescription = null, tint = AccentSky, modifier = Modifier.size(18.dp))
+                                Text(
+                                    text = "Recently Watched / History",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = TextPrimary
+                                )
+                            }
 
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(recentHistory.take(12), key = { "recent-${it.id}-${it.url}" }) { item ->
-                            if (item.isVod) {
-                                VodMovieCard(
-                                    item = item,
-                                    isFavorite = favoriteIds.contains(item.id),
-                                    onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
-                                    onClick = {
-                                        if (item.type == Kind.SERIES) selectedSeriesForEpisodes = item
-                                        else selectedMovieForDetails = item
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                modifier = Modifier.fillMaxWidth().clipToBounds()
+                            ) {
+                                items(recentHistory.take(12), key = { "recent-${it.id}-${it.url}" }) { item ->
+                                    if (item.isVod) {
+                                        VodMovieCard(
+                                            item = item,
+                                            isFavorite = favoriteIds.contains(item.id),
+                                            onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
+                                            onClick = {
+                                                if (item.type == Kind.SERIES) selectedSeriesForEpisodes = item
+                                                else selectedMovieForDetails = item
+                                            }
+                                        )
+                                    } else {
+                                        ChannelGridCard(
+                                            item = item,
+                                            channelNumber = 101,
+                                            isFavorite = favoriteIds.contains(item.id),
+                                            onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
+                                            onFocusChange = { focusedItem = item },
+                                            onClick = { onSelectChannel(item, recentHistory) },
+                                            modifier = Modifier.width(190.dp)
+                                        )
                                     }
-                                )
-                            } else {
-                                ChannelGridCard(
-                                    item = item,
-                                    channelNumber = 101,
-                                    isFavorite = favoriteIds.contains(item.id),
-                                    onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
-                                    onFocusChange = { focusedItem = item },
-                                    onClick = { onSelectChannel(item, recentHistory) },
-                                    modifier = Modifier.width(190.dp)
-                                )
+                                }
                             }
                         }
                     }
                 }
 
-                // Featured Hubs Row
-                Text(
-                    text = "Featured Hubs",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = TextPrimary
-                )
+                // Section 3: Featured Hubs Row
+                item(key = "home_featured_hubs") {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().clipToBounds(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = "Featured Hubs",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    HubShortcutCard(
-                        title = "Movies (VOD)",
-                        subtitle = "${movieChannels.size} feature films",
-                        icon = Icons.Default.PlayCircle,
-                        gradientColors = listOf(Color(0xFF7C3AED), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.MOVIES; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState())
+                                .clipToBounds(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            HubShortcutCard(
+                                title = "Movies (VOD)",
+                                subtitle = "${movieChannels.size} feature films",
+                                icon = Icons.Default.PlayCircle,
+                                gradientColors = listOf(Color(0xFF7C3AED), Color(0xFF0F172A)),
+                                onClick = { activeSection = NavSection.MOVIES; selectedFilter = "All" },
+                                modifier = Modifier.width(220.dp)
+                            )
 
-                    HubShortcutCard(
-                        title = "Series (VOD)",
-                        subtitle = "${seriesChannels.size} TV series episodes",
-                        icon = Icons.Default.Movie,
-                        gradientColors = listOf(Color(0xFF4F46E5), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.SERIES; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
+                            HubShortcutCard(
+                                title = "Series (VOD)",
+                                subtitle = "${seriesChannels.size} TV series episodes",
+                                icon = Icons.Default.Movie,
+                                gradientColors = listOf(Color(0xFF4F46E5), Color(0xFF0F172A)),
+                                onClick = { activeSection = NavSection.SERIES; selectedFilter = "All" },
+                                modifier = Modifier.width(220.dp)
+                            )
 
-                    HubShortcutCard(
-                        title = "Live Broadcast TV",
-                        subtitle = "${liveChannels.size} live streams",
-                        icon = Icons.Default.LiveTv,
-                        gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.LIVE; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
+                            HubShortcutCard(
+                                title = "Live Broadcast TV",
+                                subtitle = "${liveChannels.size} live streams",
+                                icon = Icons.Default.LiveTv,
+                                gradientColors = listOf(Color(0xFF0284C7), Color(0xFF0F172A)),
+                                onClick = { activeSection = NavSection.LIVE; selectedFilter = "All" },
+                                modifier = Modifier.width(220.dp)
+                            )
 
-                    HubShortcutCard(
-                        title = "Sky & News Hub",
-                        subtitle = "${skyChannels.size} live news feeds",
-                        icon = Icons.AutoMirrored.Filled.Feed,
-                        gradientColors = listOf(Color(0xFF0369A1), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.SKY; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
+                            HubShortcutCard(
+                                title = "Sky & News Hub",
+                                subtitle = "${skyChannels.size} live news feeds",
+                                icon = Icons.AutoMirrored.Filled.Feed,
+                                gradientColors = listOf(Color(0xFF0369A1), Color(0xFF0F172A)),
+                                onClick = { activeSection = NavSection.SKY; selectedFilter = "All" },
+                                modifier = Modifier.width(220.dp)
+                            )
 
-                    HubShortcutCard(
-                        title = "Pluto TV FAST",
-                        subtitle = "${plutoChannels.size} 24/7 channels",
-                        icon = Icons.Default.Language,
-                        gradientColors = listOf(Color(0xFFD97706), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
+                            HubShortcutCard(
+                                title = "Pluto TV FAST",
+                                subtitle = "${plutoChannels.size} 24/7 channels",
+                                icon = Icons.Default.Language,
+                                gradientColors = listOf(Color(0xFFD97706), Color(0xFF0F172A)),
+                                onClick = { activeSection = NavSection.PLUTO; selectedFilter = "All" },
+                                modifier = Modifier.width(220.dp)
+                            )
 
-                    HubShortcutCard(
-                        title = "Sports Hub",
-                        subtitle = "Highlights & live sports",
-                        icon = Icons.Default.SportsSoccer,
-                        gradientColors = listOf(Color(0xFF059669), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.LIVE; selectedFilter = "Sports" },
-                        modifier = Modifier.width(220.dp)
-                    )
+                            HubShortcutCard(
+                                title = "Sports Hub",
+                                subtitle = "Highlights & live sports",
+                                icon = Icons.Default.SportsSoccer,
+                                gradientColors = listOf(Color(0xFF059669), Color(0xFF0F172A)),
+                                onClick = { activeSection = NavSection.LIVE; selectedFilter = "Sports" },
+                                modifier = Modifier.width(220.dp)
+                            )
 
-                    HubShortcutCard(
-                        title = "Radio & Music",
-                        subtitle = "24/7 stations & hits",
-                        icon = Icons.Default.Radio,
-                        gradientColors = listOf(Color(0xFFE11D48), Color(0xFF0F172A)),
-                        onClick = { activeSection = NavSection.RADIO; selectedFilter = "All" },
-                        modifier = Modifier.width(220.dp)
-                    )
+                            HubShortcutCard(
+                                title = "Radio & Music",
+                                subtitle = "24/7 stations & hits",
+                                icon = Icons.Default.Radio,
+                                gradientColors = listOf(Color(0xFFE11D48), Color(0xFF0F172A)),
+                                onClick = { activeSection = NavSection.RADIO; selectedFilter = "All" },
+                                modifier = Modifier.width(220.dp)
+                            )
+                        }
+                    }
                 }
 
-                // Featured Movies Row
+                // Section 4: Featured Movies Row
                 if (movieChannels.isNotEmpty()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.PlayCircle, contentDescription = null, tint = AccentSky, modifier = Modifier.size(20.dp))
-                            Text(
-                                text = "Featured Movies (On Demand)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        }
-                        Text(
-                            text = "View All Movies >",
-                            color = AccentSky,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.clickable { activeSection = NavSection.MOVIES; selectedFilter = "All" }
-                        )
-                    }
+                    item(key = "home_featured_movies") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clipToBounds(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.PlayCircle, contentDescription = null, tint = AccentSky, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = "Featured Movies (On Demand)",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                }
+                                Text(
+                                    text = "View All Movies >",
+                                    color = AccentSky,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable { activeSection = NavSection.MOVIES; selectedFilter = "All" }
+                                )
+                            }
 
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(movieChannels.take(10), key = { "home-movie-${it.id}" }) { movie ->
-                            VodMovieCard(
-                                item = movie,
-                                isFavorite = favoriteIds.contains(movie.id),
-                                onToggleFavorite = {
-                                    favoritesManager.toggleFavorite(movie.id)
-                                },
-                                onClick = { selectedMovieForDetails = movie }
-                            )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.fillMaxWidth().clipToBounds()
+                            ) {
+                                items(movieChannels.take(10), key = { "home-movie-${it.id}" }) { movie ->
+                                    VodMovieCard(
+                                        item = movie,
+                                        isFavorite = favoriteIds.contains(movie.id),
+                                        onToggleFavorite = {
+                                            favoritesManager.toggleFavorite(movie.id)
+                                        },
+                                        onClick = { selectedMovieForDetails = movie }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
 
-                // Featured Series Row
+                // Section 5: Featured Series Row
                 if (seriesChannels.isNotEmpty()) {
+                    item(key = "home_featured_series") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().clipToBounds(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Icon(Icons.Default.Movie, contentDescription = null, tint = AccentGold, modifier = Modifier.size(18.dp))
+                                    Text(
+                                        text = "Featured Series (On Demand)",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = TextPrimary
+                                    )
+                                }
+                                Text(
+                                    text = "View All Series >",
+                                    color = AccentSky,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable { activeSection = NavSection.SERIES; selectedFilter = "All" }
+                                )
+                            }
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                modifier = Modifier.fillMaxWidth().clipToBounds()
+                            ) {
+                                items(seriesChannels.take(10), key = { "home-series-${it.id}" }) { series ->
+                                    VodMovieCard(
+                                        item = series,
+                                        isFavorite = favoriteIds.contains(series.id),
+                                        onToggleFavorite = {
+                                            favoritesManager.toggleFavorite(series.id)
+                                        },
+                                        onClick = { selectedSeriesForEpisodes = series }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Section 6: Live TV Highlights Grid
+                item(key = "home_live_highlights_header") {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Default.Movie, contentDescription = null, tint = AccentGold, modifier = Modifier.size(20.dp))
-                            Text(
-                                text = "Featured Series (On Demand)",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        }
                         Text(
-                            text = "View All Series >",
+                            text = "Live TV Highlights",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "${liveChannels.size + plutoChannels.size + skyChannels.size} live channels",
                             color = AccentSky,
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            modifier = Modifier.clickable { activeSection = NavSection.SERIES; selectedFilter = "All" }
+                            fontWeight = FontWeight.SemiBold
                         )
-                    }
-
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(14.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        items(seriesChannels.take(10), key = { "home-series-${it.id}" }) { series ->
-                            VodMovieCard(
-                                item = series,
-                                isFavorite = favoriteIds.contains(series.id),
-                                onToggleFavorite = {
-                                    favoritesManager.toggleFavorite(series.id)
-                                },
-                                onClick = { selectedSeriesForEpisodes = series }
-                            )
-                        }
                     }
                 }
 
-                // Recommended Live Channels
+                // Chunked 5-item rows for perfectly isolated channel grid rows in Home LazyColumn
+                val highlightItems = currentItems.take(20)
+                val chunkedRows = highlightItems.chunked(5)
+                itemsIndexed(chunkedRows, key = { rowIndex, _ -> "home_grid_row_$rowIndex" }) { rowIndex, rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth().clipToBounds(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowItems.forEachIndexed { colIndex, item ->
+                            val chNum = 101 + (rowIndex * 5) + colIndex
+                            ChannelGridCard(
+                                item = item,
+                                channelNumber = chNum,
+                                isFavorite = favoriteIds.contains(item.id),
+                                onToggleFavorite = { favoritesManager.toggleFavorite(item.id) },
+                                onFocusChange = { focusedItem = item; focusedIndex = chNum },
+                                onClick = { onSelectChannel(item, currentItems) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        // Fill remaining spaces in partial row to maintain width alignment
+                        if (rowItems.size < 5) {
+                            for (i in 0 until (5 - rowItems.size)) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+            }
+        } else if (activeSection == NavSection.MOVIES) {
+            // Dedicated, bounded Movies Section Layout
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Header Banner
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "Live TV Highlights",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "${liveChannels.size + plutoChannels.size + skyChannels.size} live channels",
-                        color = AccentSky,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(5),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(360.dp)
-                ) {
-                    itemsIndexed(
-                        items = currentItems.take(15),
-                        key = { index, it -> "${it.id}-${it.url}-$index" }
-                    ) { index, item ->
-                        val chNum = 101 + index
-                        ChannelGridCard(
-                            item = item,
-                            channelNumber = chNum,
-                            isFavorite = favoriteIds.contains(item.id),
-                            onToggleFavorite = {
-                                favoritesManager.toggleFavorite(item.id)
-                            },
-                            onFocusChange = {
-                                focusedItem = item
-                                focusedIndex = chNum
-                            },
-                            onClick = {
-                                onSelectChannel(item, currentItems)
-                            }
+                    Column {
+                        Text(
+                            text = "🎬 Movies (VOD On Demand)",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Real on-demand feature films with synopses, ratings, and instant playback.",
+                            color = TextSecondary,
+                            fontSize = 12.sp
                         )
                     }
-                }
-            }
-        } else if (activeSection == NavSection.MOVIES) {
-            // Header Banner
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "🎬 Movies (VOD On Demand)",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "Real on-demand feature films with synopses, ratings, and instant playback.",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(PrimaryBlue.copy(alpha = 0.2f))
-                        .border(1.dp, PrimaryBlue, RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "${currentItems.size} Films Available",
-                        color = AccentSky,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            // Movie Genre Filter Chips
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                movieFilterGenres.forEach { genre ->
-                    val isSelected = selectedFilter.equals(genre, ignoreCase = true)
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
-                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
-                            .clickable { selectedFilter = genre }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(PrimaryBlue.copy(alpha = 0.2f))
+                            .border(1.dp, PrimaryBlue, RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = genre,
-                            color = if (isSelected) Color.White else TextSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            text = "${currentItems.size} Films Available",
+                            color = AccentSky,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
                         )
                     }
                 }
-            }
 
-            // 6-Column 2:3 Movie Poster Grid
-            if (currentItems.isEmpty()) {
-                Box(
+                // Movie Genre Filter Chips
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
+                        .horizontalScroll(rememberScrollState())
+                        .clipToBounds(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(Icons.Default.MovieFilter, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
-                        Text("No movies found for '$selectedFilter'", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                        Text("Try selecting 'All' or searching for another title.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(6),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    itemsIndexed(
-                        items = currentItems,
-                        key = { index, it -> "vod-movie-${it.id}-$index" }
-                    ) { _, movie ->
-                        VodMovieCard(
-                            item = movie,
-                            isFavorite = favoriteIds.contains(movie.id),
-                            onToggleFavorite = {
-                                favoritesManager.toggleFavorite(movie.id)
-                            },
-                            onClick = {
-                                selectedMovieForDetails = movie
-                            }
-                        )
-                    }
-                }
-            }
-        } else if (activeSection == NavSection.SERIES) {
-            // Series Header Banner
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column {
-                    Text(
-                        text = "📺 TV Series (VOD On Demand)",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = TextPrimary
-                    )
-                    Text(
-                        text = "Episodic television series on demand with full seasons and episode picker.",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF4F46E5).copy(alpha = 0.2f))
-                        .border(1.dp, Color(0xFF4F46E5), RoundedCornerShape(8.dp))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = "${currentItems.size} Series Available",
-                        color = AccentSky,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
-                    )
-                }
-            }
-
-            // Series Genre Filter Chips
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                seriesFilterGenres.forEach { genre ->
-                    val isSelected = selectedFilter.equals(genre, ignoreCase = true)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
-                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
-                            .clickable { selectedFilter = genre }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = genre,
-                            color = if (isSelected) Color.White else TextSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            // 6-Column 2:3 Series Poster Grid
-            if (currentItems.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(Icons.Default.Tv, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
-                        Text("No series found for '$selectedFilter'", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                        Text("Try selecting 'All' or searching for another title.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
-                    }
-                }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(6),
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                ) {
-                    itemsIndexed(
-                        items = currentItems,
-                        key = { index, it -> "vod-series-${it.id}-$index" }
-                    ) { _, series ->
-                        VodMovieCard(
-                            item = series,
-                            isFavorite = favoriteIds.contains(series.id),
-                            onToggleFavorite = {
-                                favoritesManager.toggleFavorite(series.id)
-                            },
-                            onClick = {
-                                selectedSeriesForEpisodes = series
-                            }
-                        )
-                    }
-                }
-            }
-        } else {
-            // Live / Pluto / Sky / Radio / Favorites Grid
-            FocusedChannelHeaderBar(
-                item = focusedItem,
-                channelNumber = focusedIndex,
-                onWatchClick = {
-                    focusedItem?.let { onSelectChannel(it, currentItems) }
-                }
-            )
-
-            // Horizontal Filter Chips Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                liveFilterCategories.forEach { cat ->
-                    val isSelected = selectedFilter.equals(cat, ignoreCase = true)
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
-                            .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
-                            .clickable { selectedFilter = cat }
-                            .padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        Text(
-                            text = cat,
-                            color = if (isSelected) Color.White else TextSecondary,
-                            fontSize = 12.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                        )
-                    }
-                }
-
-                if (activeSection == NavSection.LIVE || activeSection == NavSection.FAVORITES) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Box(modifier = Modifier.width(1.dp).height(20.dp).background(BorderSubtle))
-                    Spacer(modifier = Modifier.width(4.dp))
-
-                    countriesList.forEach { (code, label) ->
-                        val isSelected = selectedFilter.equals(code, ignoreCase = true)
-                        val count = countryCounts[code] ?: 0
+                    movieFilterGenres.forEach { genre ->
+                        val isSelected = selectedFilter.equals(genre, ignoreCase = true)
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
                                 .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
                                 .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
-                                .clickable { selectedFilter = code }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .clickable { selectedFilter = genre }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
                         ) {
                             Text(
-                                text = if (count > 0) "$label ($count)" else label,
+                                text = genre,
                                 color = if (isSelected) Color.White else TextSecondary,
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
@@ -1116,63 +949,302 @@ fun HomeScreen(
                         }
                     }
                 }
-            }
 
-            // 5-Column Channel Grid
-            if (isLoading && currentItems.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    CircularProgressIndicator(color = AccentSky, modifier = Modifier.size(36.dp))
-                }
-            } else if (currentItems.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                // 6-Column 2:3 Movie Poster Grid
+                if (currentItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(Icons.Default.TvOff, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
-                        Text("No channels found in this section", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
-                        Text("Try selecting 'All' or adjusting your search query.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.MovieFilter, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
+                            Text("No movies found for '$selectedFilter'", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("Try selecting 'All' or searching for another title.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(6),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clipToBounds(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        itemsIndexed(
+                            items = currentItems,
+                            key = { index, it -> "vod-movie-${it.id}-$index" }
+                        ) { _, movie ->
+                            VodMovieCard(
+                                item = movie,
+                                isFavorite = favoriteIds.contains(movie.id),
+                                onToggleFavorite = {
+                                    favoritesManager.toggleFavorite(movie.id)
+                                },
+                                onClick = {
+                                    selectedMovieForDetails = movie
+                                }
+                            )
+                        }
                     }
                 }
-            } else {
-                LazyVerticalGrid(
-                    columns = GridCells.Fixed(5),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
+            }
+        } else if (activeSection == NavSection.SERIES) {
+            // Dedicated, bounded Series Section Layout
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Series Header Banner
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "📺 TV Series (VOD On Demand)",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.ExtraBold,
+                            color = TextPrimary
+                        )
+                        Text(
+                            text = "Episodic television series on demand with full seasons and episode picker.",
+                            color = TextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF4F46E5).copy(alpha = 0.2f))
+                            .border(1.dp, Color(0xFF4F46E5), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                    ) {
+                        Text(
+                            text = "${currentItems.size} Series Available",
+                            color = AccentSky,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                // Series Genre Filter Chips
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f)
+                        .horizontalScroll(rememberScrollState())
+                        .clipToBounds(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    itemsIndexed(
-                        items = currentItems,
-                        key = { index, it -> "${it.id}-${it.url}-$index" }
-                    ) { index, item ->
-                        val chNum = 101 + index
-                        ChannelGridCard(
-                            item = item,
-                            channelNumber = chNum,
-                            isFavorite = favoriteIds.contains(item.id),
-                            onToggleFavorite = {
-                                favoritesManager.toggleFavorite(item.id)
-                            },
-                            onFocusChange = {
-                                focusedItem = item
-                                focusedIndex = chNum
-                            },
-                            onClick = {
-                                onSelectChannel(item, currentItems)
+                    seriesFilterGenres.forEach { genre ->
+                        val isSelected = selectedFilter.equals(genre, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                                .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                                .clickable { selectedFilter = genre }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = genre,
+                                color = if (isSelected) Color.White else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+                }
+
+                // 6-Column 2:3 Series Poster Grid
+                if (currentItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Tv, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
+                            Text("No series found for '$selectedFilter'", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("Try selecting 'All' or searching for another title.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(6),
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clipToBounds(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        itemsIndexed(
+                            items = currentItems,
+                            key = { index, it -> "vod-series-${it.id}-$index" }
+                        ) { _, series ->
+                            VodMovieCard(
+                                item = series,
+                                isFavorite = favoriteIds.contains(series.id),
+                                onToggleFavorite = {
+                                    favoritesManager.toggleFavorite(series.id)
+                                },
+                                onClick = {
+                                    selectedSeriesForEpisodes = series
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        } else {
+            // Dedicated Live / Pluto / Sky / Radio / Favorites Section Layout
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Focused Channel Header Bar (EPG Now & Next)
+                FocusedChannelHeaderBar(
+                    item = focusedItem,
+                    channelNumber = focusedIndex,
+                    onWatchClick = {
+                        focusedItem?.let { onSelectChannel(it, currentItems) }
+                    },
+                    modifier = Modifier.fillMaxWidth().clipToBounds()
+                )
+
+                // Horizontal Filter Chips Row (Categories & Countries)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .clipToBounds(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    liveFilterCategories.forEach { cat ->
+                        val isSelected = selectedFilter.equals(cat, ignoreCase = true)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                                .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                                .clickable { selectedFilter = cat }
+                                .padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            Text(
+                                text = cat,
+                                color = if (isSelected) Color.White else TextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                            )
+                        }
+                    }
+
+                    if (activeSection == NavSection.LIVE || activeSection == NavSection.FAVORITES) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Box(modifier = Modifier.width(1.dp).height(20.dp).background(BorderSubtle))
+                        Spacer(modifier = Modifier.width(4.dp))
+
+                        countriesList.forEach { (code, label) ->
+                            val isSelected = selectedFilter.equals(code, ignoreCase = true)
+                            val count = countryCounts[code] ?: 0
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isSelected) PrimaryBlue else Color(0xFF1E293B))
+                                    .border(1.dp, if (isSelected) AccentSky else BorderSubtle, RoundedCornerShape(16.dp))
+                                    .clickable { selectedFilter = code }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = if (count > 0) "$label ($count)" else label,
+                                    color = if (isSelected) Color.White else TextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
                             }
-                        )
+                        }
+                    }
+                }
+
+                // 5-Column Channel Grid
+                if (isLoading && currentItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CircularProgressIndicator(color = AccentSky, modifier = Modifier.size(36.dp))
+                    }
+                } else if (currentItems.isEmpty()) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.TvOff, contentDescription = null, tint = TextMuted, modifier = Modifier.size(40.dp))
+                            Text("No channels found in this section", style = MaterialTheme.typography.titleMedium, color = TextPrimary, fontWeight = FontWeight.Bold)
+                            Text("Try selecting 'All' or adjusting your search query.", style = MaterialTheme.typography.bodySmall, color = TextSecondary)
+                        }
+                    }
+                } else {
+                    LazyVerticalGrid(
+                        columns = GridCells.Fixed(5),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f)
+                            .clipToBounds(),
+                        contentPadding = PaddingValues(bottom = 16.dp)
+                    ) {
+                        itemsIndexed(
+                            items = currentItems,
+                            key = { index, it -> "${it.id}-${it.url}-$index" }
+                        ) { index, item ->
+                            val chNum = 101 + index
+                            ChannelGridCard(
+                                item = item,
+                                channelNumber = chNum,
+                                isFavorite = favoriteIds.contains(item.id),
+                                onToggleFavorite = {
+                                    favoritesManager.toggleFavorite(item.id)
+                                },
+                                onFocusChange = {
+                                    focusedItem = item
+                                    focusedIndex = chNum
+                                },
+                                onClick = {
+                                    onSelectChannel(item, currentItems)
+                                }
+                            )
+                        }
                     }
                 }
             }
