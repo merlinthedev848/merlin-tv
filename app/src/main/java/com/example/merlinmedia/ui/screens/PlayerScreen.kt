@@ -46,6 +46,7 @@ import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.player.ExoPlayerHelper
 import com.example.merlinmedia.ui.components.*
+import com.example.merlinmedia.ui.dialogs.AudioAndSubtitleDialog
 import com.example.merlinmedia.ui.dialogs.SleepTimerDialog
 import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.delay
@@ -66,12 +67,18 @@ fun PlayerScreen(
     var showControls by remember { mutableStateOf(true) }
     var showMiniGuide by remember { mutableStateOf(false) }
     var showSleepTimerDialog by remember { mutableStateOf(false) }
+    var showAudioSubtitlesDialog by remember { mutableStateOf(false) }
     var sleepTimerRemainingMinutes by remember { mutableIntStateOf(0) }
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
     var miniGuideSearch by remember { mutableStateOf("") }
     var aspectMode by remember { mutableStateOf(AspectRatioMode.FIT) }
     var reconnectAttempt by remember { mutableIntStateOf(0) }
     var isAutoReconnecting by remember { mutableStateOf(false) }
+    
+    // Numeric Keypad Input State (e.g. user types "1", "0", "5" to jump to Ch. 105)
+    var numericChannelInput by remember { mutableStateOf("") }
+    var numericKeyTimestamp by remember { mutableLongStateOf(0L) }
+
     val coroutineScope = rememberCoroutineScope()
 
     val favoriteIds by favoritesManager.favoriteIds.collectAsState()
@@ -91,11 +98,26 @@ fun PlayerScreen(
         }
     }
 
-    // Auto-hide controls after 5 seconds if mini guide is not open
-    LaunchedEffect(showControls, isPlaying, showMiniGuide, showSleepTimerDialog) {
-        if (showControls && isPlaying && errorMessage == null && !showMiniGuide && !showSleepTimerDialog && !isAutoReconnecting) {
+    // Auto-hide controls after 5 seconds if mini guide / dialogs are not open
+    LaunchedEffect(showControls, isPlaying, showMiniGuide, showSleepTimerDialog, showAudioSubtitlesDialog) {
+        if (showControls && isPlaying && errorMessage == null && !showMiniGuide && !showSleepTimerDialog && !showAudioSubtitlesDialog && !isAutoReconnecting) {
             delay(5000)
             showControls = false
+        }
+    }
+
+    // Numeric keypad auto-jump timer (1.2s timeout after last keypress)
+    LaunchedEffect(numericKeyTimestamp) {
+        if (numericChannelInput.isNotEmpty()) {
+            delay(1200L)
+            val channelNumber = numericChannelInput.toIntOrNull()
+            if (channelNumber != null) {
+                val targetIndex = (channelNumber - 101).coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
+                if (targetIndex in playlist.indices) {
+                    playItem(playlist[targetIndex])
+                }
+            }
+            numericChannelInput = ""
         }
     }
 
@@ -199,7 +221,9 @@ fun PlayerScreen(
 
     // Multi-level Back Handler
     BackHandler {
-        if (showSleepTimerDialog) {
+        if (showAudioSubtitlesDialog) {
+            showAudioSubtitlesDialog = false
+        } else if (showSleepTimerDialog) {
             showSleepTimerDialog = false
         } else if (showMiniGuide) {
             showMiniGuide = false
@@ -216,9 +240,43 @@ fun PlayerScreen(
             .background(Color.Black)
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
-                    when (event.nativeKeyEvent.keyCode) {
+                    val keyCode = event.nativeKeyEvent.keyCode
+                    // Handle Numeric Keypad (0-9) Direct Channel Tuning
+                    val digit = when (keyCode) {
+                        KeyEvent.KEYCODE_0, KeyEvent.KEYCODE_NUMPAD_0 -> "0"
+                        KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_NUMPAD_1 -> "1"
+                        KeyEvent.KEYCODE_2, KeyEvent.KEYCODE_NUMPAD_2 -> "2"
+                        KeyEvent.KEYCODE_3, KeyEvent.KEYCODE_NUMPAD_3 -> "3"
+                        KeyEvent.KEYCODE_4, KeyEvent.KEYCODE_NUMPAD_4 -> "4"
+                        KeyEvent.KEYCODE_5, KeyEvent.KEYCODE_NUMPAD_5 -> "5"
+                        KeyEvent.KEYCODE_6, KeyEvent.KEYCODE_NUMPAD_6 -> "6"
+                        KeyEvent.KEYCODE_7, KeyEvent.KEYCODE_NUMPAD_7 -> "7"
+                        KeyEvent.KEYCODE_8, KeyEvent.KEYCODE_NUMPAD_8 -> "8"
+                        KeyEvent.KEYCODE_9, KeyEvent.KEYCODE_NUMPAD_9 -> "9"
+                        else -> null
+                    }
+
+                    if (digit != null && !showMiniGuide) {
+                        if (numericChannelInput.length < 4) {
+                            numericChannelInput += digit
+                            numericKeyTimestamp = System.currentTimeMillis()
+                        }
+                        return@onKeyEvent true
+                    }
+
+                    when (keyCode) {
                         KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER -> {
-                            if (!showControls && !showMiniGuide) {
+                            if (numericChannelInput.isNotEmpty()) {
+                                val channelNumber = numericChannelInput.toIntOrNull()
+                                if (channelNumber != null) {
+                                    val targetIndex = (channelNumber - 101).coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
+                                    if (targetIndex in playlist.indices) {
+                                        playItem(playlist[targetIndex])
+                                    }
+                                }
+                                numericChannelInput = ""
+                                true
+                            } else if (!showControls && !showMiniGuide) {
                                 showControls = true
                                 true
                             } else {
@@ -307,6 +365,27 @@ fun PlayerScreen(
             },
             modifier = Modifier.fillMaxSize()
         )
+
+        // Numeric Keypad Quick Jump Overlay
+        if (numericChannelInput.isNotEmpty()) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = 24.dp, end = 32.dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color.Black.copy(alpha = 0.85f))
+                    .border(2.dp, AccentSky, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 24.dp, vertical = 14.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text("Ch. ", color = AccentSky, fontWeight = FontWeight.Bold, fontSize = 24.sp)
+                    Text(numericChannelInput, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp)
+                }
+            }
+        }
 
         // Buffering / Reconnecting Indicator
         if ((isBuffering || isAutoReconnecting) && errorMessage == null) {
@@ -480,6 +559,18 @@ fun PlayerScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
+                            // Audio & Subtitle Selector Button
+                            Button(
+                                onClick = { showAudioSubtitlesDialog = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = CardSurface),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(1.dp, BorderSubtle)
+                            ) {
+                                Icon(Icons.Default.Subtitles, contentDescription = "Audio & Subtitles", tint = AccentSky, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Audio / CC", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                            }
+
                             // Sleep Timer Indicator/Button
                             Button(
                                 onClick = { showSleepTimerDialog = true },
@@ -761,6 +852,14 @@ fun PlayerScreen(
                     sleepTimerRemainingMinutes = mins
                 },
                 onDismiss = { showSleepTimerDialog = false }
+            )
+        }
+
+        // Audio & Subtitles Dialog
+        if (showAudioSubtitlesDialog) {
+            AudioAndSubtitleDialog(
+                player = player,
+                onDismiss = { showAudioSubtitlesDialog = false }
             )
         }
     }

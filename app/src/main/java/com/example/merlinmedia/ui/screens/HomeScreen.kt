@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Feed
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -36,6 +37,7 @@ import com.example.merlinmedia.model.UpdateInfo
 import com.example.merlinmedia.ui.components.*
 import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 enum class NavSection {
@@ -48,6 +50,13 @@ enum class NavSection {
     RADIO,
     HUB,
     FAVORITES
+}
+
+enum class SortMode(val label: String) {
+    DEFAULT("Default"),
+    ALPHABETICAL("A to Z"),
+    QUALITY("4K / FHD First"),
+    COUNTRY("By Country")
 }
 
 @Composable
@@ -72,7 +81,9 @@ fun HomeScreen(
     var activeSection by remember { mutableStateOf(NavSection.HOME) }
     var selectedFilter by remember { mutableStateOf("All") }
     var searchQuery by remember { mutableStateOf("") }
+    var debouncedSearchQuery by remember { mutableStateOf("") }
     var showSearchBar by remember { mutableStateOf(false) }
+    var currentSortMode by remember { mutableStateOf(SortMode.DEFAULT) }
 
     val favoriteIds by favoritesManager.favoriteIds.collectAsState()
     val recentHistory by favoritesManager.recentHistory.collectAsState()
@@ -87,13 +98,19 @@ fun HomeScreen(
     // Hero Carousel Index
     var heroSlideIndex by remember { mutableIntStateOf(0) }
 
+    // Debounce search query to prevent stutter on 5,000+ item grids
+    LaunchedEffect(searchQuery) {
+        delay(200L)
+        debouncedSearchQuery = searchQuery
+    }
+
     // Live Clock State
     var currentTime by remember { mutableStateOf("") }
     LaunchedEffect(Unit) {
         val formatter = java.text.SimpleDateFormat("h:mm a  EEE, dd MMM", java.util.Locale.getDefault())
         while (true) {
             currentTime = formatter.format(java.util.Date())
-            kotlinx.coroutines.delay(1000)
+            delay(1000)
         }
     }
 
@@ -160,15 +177,15 @@ fun HomeScreen(
     // Auto-cycle Hero Carousel safely
     LaunchedEffect(heroSlides.size) {
         while (true) {
-            kotlinx.coroutines.delay(8000)
+            delay(8000)
             if (heroSlides.isNotEmpty()) {
                 heroSlideIndex = (heroSlideIndex + 1) % heroSlides.size
             }
         }
     }
 
-    // Filter Logic based on Active Section
-    val currentItems = remember(activeSection, selectedFilter, searchQuery, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds) {
+    // High-performance filter & sort derivation
+    val currentItems = remember(activeSection, selectedFilter, debouncedSearchQuery, currentSortMode, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds) {
         val baseList = when (activeSection) {
             NavSection.HOME, NavSection.HUB -> skyChannels + plutoChannels.take(40) + liveChannels.take(40) + movieChannels.take(20)
             NavSection.LIVE -> liveChannels
@@ -201,10 +218,10 @@ fun HomeScreen(
             }
         }
 
-        if (searchQuery.isBlank()) {
+        val searchedList = if (debouncedSearchQuery.isBlank()) {
             filteredByFilter
         } else {
-            val q = searchQuery.trim().lowercase()
+            val q = debouncedSearchQuery.trim().lowercase()
             filteredByFilter.filter { item ->
                 item.title.lowercase().contains(q) ||
                 item.group.lowercase().contains(q) ||
@@ -212,6 +229,21 @@ fun HomeScreen(
                 item.country.lowercase().contains(q) ||
                 item.description.lowercase().contains(q)
             }
+        }
+
+        // Apply Sorting
+        when (currentSortMode) {
+            SortMode.DEFAULT -> searchedList
+            SortMode.ALPHABETICAL -> searchedList.sortedBy { it.title.lowercase() }
+            SortMode.QUALITY -> searchedList.sortedByDescending {
+                when {
+                    it.quality.contains("4K", ignoreCase = true) -> 4
+                    it.quality.contains("1080", ignoreCase = true) -> 3
+                    it.quality.contains("720", ignoreCase = true) -> 2
+                    else -> 1
+                }
+            }
+            SortMode.COUNTRY -> searchedList.sortedBy { it.country.lowercase() }
         }
     }
 
@@ -415,6 +447,24 @@ fun HomeScreen(
                     modifier = Modifier.padding(end = 4.dp)
                 )
 
+                // Sort Mode Button
+                IconButton(
+                    onClick = {
+                        currentSortMode = when (currentSortMode) {
+                            SortMode.DEFAULT -> SortMode.ALPHABETICAL
+                            SortMode.ALPHABETICAL -> SortMode.QUALITY
+                            SortMode.QUALITY -> SortMode.COUNTRY
+                            SortMode.COUNTRY -> SortMode.DEFAULT
+                        }
+                    },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(if (currentSortMode != SortMode.DEFAULT) AccentSky.copy(alpha = 0.3f) else Color(0xFF1E293B))
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = "Sort: ${currentSortMode.label}", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+
                 // Search Icon
                 IconButton(
                     onClick = { showSearchBar = !showSearchBar },
@@ -474,12 +524,24 @@ fun HomeScreen(
             }
         }
 
-        // Expandable Search Bar
+        // Expandable Search Bar & Active Sort Indicator
         AnimatedVisibility(visible = showSearchBar) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
+                if (currentSortMode != SortMode.DEFAULT) {
+                    Text(
+                        text = "Sorting: ${currentSortMode.label}",
+                        color = AccentSky,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(1.dp))
+                }
+
                 TvSearchBar(
                     query = searchQuery,
                     onQueryChange = { searchQuery = it },
