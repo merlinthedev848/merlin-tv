@@ -2,6 +2,9 @@ package com.example.merlinmedia.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.example.merlinmedia.data.local.AppDatabase
+import com.example.merlinmedia.data.local.entity.FavoriteEntity
+import com.example.merlinmedia.data.local.entity.RecentItemEntity
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import kotlinx.coroutines.CoroutineScope
@@ -10,12 +13,17 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import org.json.JSONArray
-import org.json.JSONObject
+import timber.log.Timber
 import java.io.Closeable
 
 class FavoritesManager(context: Context) : Closeable {
+    private val database: AppDatabase = AppDatabase.getInstance(context)
+    private val favoritesDao = database.favoritesDao()
+    private val recentHistoryDao = database.recentHistoryDao()
+
     private val prefs: SharedPreferences = context.getSharedPreferences("merlin_favorites_prefs", Context.MODE_PRIVATE)
     private val managerJob = SupervisorJob()
     private val ioScope = CoroutineScope(Dispatchers.IO + managerJob)
@@ -23,6 +31,7 @@ class FavoritesManager(context: Context) : Closeable {
     companion object {
         private const val KEY_FAVORITES = "favorite_channel_ids"
         private const val KEY_RECENT_HISTORY = "recent_history_json"
+        private const val KEY_MIGRATED_TO_ROOM = "migrated_to_room_v1"
         private const val MAX_HISTORY = 40
     }
 
@@ -35,6 +44,7 @@ class FavoritesManager(context: Context) : Closeable {
     private val lock = Any()
 
     init {
+        // 1. Initial fast memory seeding from SharedPreferences (for instant UI responsiveness)
         synchronized(lock) {
             val storedFavs = prefs.getStringSet(KEY_FAVORITES, emptySet()) ?: emptySet()
             _favoriteIds.value = HashSet(storedFavs)
@@ -70,9 +80,58 @@ class FavoritesManager(context: Context) : Closeable {
                             )
                         )
                     }
+                }.onFailure { e ->
+                    Timber.e(e, "Failed to parse initial recent history from prefs")
                 }
                 _recentHistory.value = list
             }
+        }
+
+        // 2. Perform one-time migration to Room if not yet done
+        ioScope.launch {
+            runCatching {
+                migrateFromPrefsToRoomIfNeeded()
+            }.onFailure { e ->
+                Timber.e(e, "Error migrating prefs to Room")
+            }
+
+            // 3. Observe Room database changes reactively
+            launch {
+                favoritesDao.getAllFavoriteIdsFlow().collectLatest { ids ->
+                    synchronized(lock) {
+                        _favoriteIds.value = ids.toSet()
+                    }
+                }
+            }
+
+            launch {
+                recentHistoryDao.getRecentHistoryFlow(MAX_HISTORY).collectLatest { entities ->
+                    val entries = entities.map { it.toMediaEntry() }
+                    synchronized(lock) {
+                        _recentHistory.value = entries
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun migrateFromPrefsToRoomIfNeeded() {
+        val isMigrated = prefs.getBoolean(KEY_MIGRATED_TO_ROOM, false)
+        if (!isMigrated) {
+            val storedFavs = prefs.getStringSet(KEY_FAVORITES, emptySet()) ?: emptySet()
+            if (storedFavs.isNotEmpty()) {
+                val entities = storedFavs.map { FavoriteEntity(id = it) }
+                favoritesDao.insertFavorites(entities)
+            }
+
+            val initialHistory = _recentHistory.value
+            if (initialHistory.isNotEmpty()) {
+                val entities = initialHistory.map { RecentItemEntity.fromMediaEntry(it) }
+                recentHistoryDao.insertRecentItems(entities)
+            }
+
+            prefs.edit().putBoolean(KEY_MIGRATED_TO_ROOM, true).apply()
+            Timber.d("Successfully migrated favorites and history to Room DB")
         }
     }
 
@@ -85,60 +144,49 @@ class FavoritesManager(context: Context) : Closeable {
     }
 
     fun toggleFavorite(id: String): Boolean {
-        val newState: Boolean
-        val updated: Set<String>
-        synchronized(lock) {
-            val current = HashSet(_favoriteIds.value)
-            if (current.contains(id)) {
-                current.remove(id)
-                newState = false
-            } else {
-                current.add(id)
-                newState = true
-            }
-            updated = current
-            _favoriteIds.value = updated
+        val isCurrentlyFav = isFavorite(id)
+        if (isCurrentlyFav) {
+            removeFavorite(id)
+            return false
+        } else {
+            addFavorite(id)
+            return true
         }
-        persistFavoritesAsync(updated)
-        return newState
     }
 
     fun addFavorite(id: String) {
-        val updated: Set<String>
         synchronized(lock) {
             val current = HashSet(_favoriteIds.value)
             if (current.add(id)) {
-                updated = current
-                _favoriteIds.value = updated
-            } else {
-                return
+                _favoriteIds.value = current
             }
         }
-        persistFavoritesAsync(updated)
+        ioScope.launch {
+            runCatching {
+                favoritesDao.insertFavorite(FavoriteEntity(id = id))
+            }.onFailure { e ->
+                Timber.e(e, "Failed to insert favorite: $id")
+            }
+        }
     }
 
     fun removeFavorite(id: String) {
-        val updated: Set<String>
         synchronized(lock) {
             val current = HashSet(_favoriteIds.value)
             if (current.remove(id)) {
-                updated = current
-                _favoriteIds.value = updated
-            } else {
-                return
+                _favoriteIds.value = current
             }
         }
-        persistFavoritesAsync(updated)
-    }
-
-    private fun persistFavoritesAsync(snapshot: Set<String>) {
         ioScope.launch {
-            prefs.edit().putStringSet(KEY_FAVORITES, snapshot).apply()
+            runCatching {
+                favoritesDao.deleteFavoriteById(id)
+            }.onFailure { e ->
+                Timber.e(e, "Failed to delete favorite: $id")
+            }
         }
     }
 
     fun addToRecent(entry: MediaEntry) {
-        val updated: List<MediaEntry>
         synchronized(lock) {
             val current = _recentHistory.value.toMutableList()
             current.removeAll { it.url == entry.url || (it.id.isNotBlank() && it.id == entry.id) }
@@ -146,45 +194,32 @@ class FavoritesManager(context: Context) : Closeable {
             while (current.size > MAX_HISTORY) {
                 current.removeAt(current.size - 1)
             }
-            updated = current
-            _recentHistory.value = updated
+            _recentHistory.value = current
         }
-        persistRecentHistoryAsync(updated)
+        ioScope.launch {
+            runCatching {
+                val entity = RecentItemEntity.fromMediaEntry(entry)
+                recentHistoryDao.insertRecentItem(entity)
+                recentHistoryDao.trimRecentHistory(MAX_HISTORY)
+            }.onFailure { e ->
+                Timber.e(e, "Failed to insert recent item: ${entry.title}")
+            }
+        }
     }
 
     fun getRecentHistory(): List<MediaEntry> {
         return _recentHistory.value
     }
 
-    private fun persistRecentHistoryAsync(snapshot: List<MediaEntry>) {
+    fun clearRecentHistory() {
+        synchronized(lock) {
+            _recentHistory.value = emptyList()
+        }
         ioScope.launch {
             runCatching {
-                val jsonArray = JSONArray()
-                for (item in snapshot) {
-                    val obj = JSONObject().apply {
-                        put("id", item.id)
-                        put("title", item.title)
-                        put("url", item.url)
-                        put("type", item.type.name)
-                        put("country", item.country)
-                        put("group", item.group)
-                        put("logo", item.logo ?: "")
-                        put("description", item.description)
-                        put("source", item.source)
-                        put("year", item.year)
-                        put("duration", item.duration)
-                        put("genre", item.genre)
-                        put("rating", item.rating)
-                        if (item.season != null) put("season", item.season)
-                        if (item.episode != null) put("episode", item.episode)
-                        put("backdrop", item.backdrop ?: "")
-                        put("isVod", item.isVod)
-                        put("quality", item.quality)
-                        put("tvgId", item.tvgId)
-                    }
-                    jsonArray.put(obj)
-                }
-                prefs.edit().putString(KEY_RECENT_HISTORY, jsonArray.toString()).apply()
+                recentHistoryDao.clearAllRecentHistory()
+            }.onFailure { e ->
+                Timber.e(e, "Failed to clear recent history")
             }
         }
     }

@@ -15,6 +15,7 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
+import timber.log.Timber
 
 object UpdateManager {
     const val GITHUB_REPO = "merlinthedev848/merlin-tv"
@@ -169,7 +170,8 @@ object UpdateManager {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(settingsIntent)
-            }.onFailure {
+            }.onFailure { error ->
+                Timber.w(error, "Failed to launch ACTION_MANAGE_UNKNOWN_APP_SOURCES intent")
                 val fallbackIntent = Intent(Settings.ACTION_SECURITY_SETTINGS).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }

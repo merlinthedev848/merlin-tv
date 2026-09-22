@@ -1,8 +1,8 @@
 {
-  "version": "1.5.0",
-  "versionCode": 150,
-  "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v1.5.0",
-  "releaseNotes": "Merlin TV v1.5.0: Major overhaul with Real XMLTV EPG now/next guide, Sleep Timer (15-120m), VOD Playback Speed controls (0.75x-2.0x), Recently Watched history row, Offline warning banner with auto-retry, thread-safety fixes, and hardware-accelerated TV focus animations.",
-  "publishedAt": "2026-09-21T09:30:00Z"
+  "version": "2.0.0",
+  "versionCode": 200,
+  "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/releases/download/v2.0.0/merlin-tv-2.0.0.apk",
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.0.0",
+  "releaseNotes": "Merlin TV v2.0.0: Complete Architectural & Performance Overhaul.\n- Upgraded to MVVM Architecture with Hilt Dependency Injection\n- Persistent Room Database for Favorites & Recently Watched History\n- Modular & Hardware-Accelerated UI Component Structure\n- Bounded 4-Thread Dispatcher for low-latency channel & catalog fetching\n- Production Timber Logging and Zero raw stack traces\n- Security Hardening with Stream URL Validation & Metadata Sanitization\n- Automated GitHub Actions CI/CD Pipeline & Optimized ProGuard/R8 rules",
+  "publishedAt": "2026-09-22T10:50:00Z"
 }

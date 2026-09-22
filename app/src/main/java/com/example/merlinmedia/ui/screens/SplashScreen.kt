@@ -4,6 +4,7 @@ import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,7 +36,8 @@ import com.example.merlinmedia.ui.theme.TextSecondary
 
 @Composable
 fun SplashScreen(
-    loadingStatus: String = "Loading Merlin TV Catalogs & Streams..."
+    loadingStatus: String = "Loading Merlin TV Catalogs & Streams...",
+    onSkip: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var hasVideoError by remember { mutableStateOf(false) }
@@ -62,7 +64,8 @@ fun SplashScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black),
+            .background(Color.Black)
+            .clickable { onSkip?.invoke() },
         contentAlignment = Alignment.Center
     ) {
         if (introPlayer != null && !hasVideoError) {

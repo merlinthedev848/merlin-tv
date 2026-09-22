@@ -12,6 +12,7 @@ import java.io.StringReader
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
+import timber.log.Timber
 
 object EpgRepository {
     private const val PLEX_EPG_URL = "https://i.mjh.nz/Plex/all.xml"
@@ -66,7 +67,7 @@ object EpgRepository {
                 isInitialized = true
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Timber.e(e, "Failed to initialize EPG repository")
         } finally {
             isLoading = false
         }

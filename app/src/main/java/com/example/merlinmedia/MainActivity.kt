@@ -1,132 +1,77 @@
 package com.example.merlinmedia
 
 import android.os.Bundle
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalContext
-import com.example.merlinmedia.data.CatalogRepository
-import com.example.merlinmedia.data.FavoritesManager
-import com.example.merlinmedia.data.NetworkMonitor
-import com.example.merlinmedia.model.MediaEntry
-import com.example.merlinmedia.model.UpdateInfo
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.merlinmedia.ui.MainViewModel
 import com.example.merlinmedia.ui.dialogs.SettingsDialog
 import com.example.merlinmedia.ui.dialogs.UpdateDialog
 import com.example.merlinmedia.ui.screens.HomeScreen
 import com.example.merlinmedia.ui.screens.PlayerScreen
 import com.example.merlinmedia.ui.screens.SplashScreen
 import com.example.merlinmedia.ui.theme.MerlinTvTheme
-import com.example.merlinmedia.updater.UpdateManager
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
-    private lateinit var favoritesManager: FavoritesManager
-    private lateinit var networkMonitor: NetworkMonitor
+    private val viewModel: MainViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        favoritesManager = FavoritesManager(this)
-        networkMonitor = NetworkMonitor(this)
-
         setContent {
             MerlinTvTheme {
-                MerlinTvApp(
-                    favoritesManager = favoritesManager,
-                    networkMonitor = networkMonitor
-                )
+                MerlinTvApp(viewModel = viewModel)
             }
         }
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        favoritesManager.close()
     }
 }
 
 @Composable
-fun MerlinTvApp(
-    favoritesManager: FavoritesManager,
-    networkMonitor: NetworkMonitor
-) {
-    val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val isOnline by networkMonitor.isOnline.collectAsState(initial = networkMonitor.isCurrentlyConnected())
+fun MerlinTvApp(viewModel: MainViewModel) {
 
-    var liveChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
-    var plutoChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
-    var skyChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
-    var movieChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
-    var seriesChannels by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var availableUpdate by remember { mutableStateOf<UpdateInfo?>(null) }
+    // Collect all state from ViewModel
+    val liveChannels by viewModel.liveChannels.collectAsStateWithLifecycle()
+    val plutoChannels by viewModel.plutoChannels.collectAsStateWithLifecycle()
+    val skyChannels by viewModel.skyChannels.collectAsStateWithLifecycle()
+    val movieChannels by viewModel.movieChannels.collectAsStateWithLifecycle()
+    val seriesChannels by viewModel.seriesChannels.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val isSplashDone by viewModel.isSplashDone.collectAsStateWithLifecycle()
+    val availableUpdate by viewModel.availableUpdate.collectAsStateWithLifecycle()
+    val selectedItem by viewModel.selectedItem.collectAsStateWithLifecycle()
+    val activePlaylist by viewModel.activePlaylist.collectAsStateWithLifecycle()
+    val isOnline by viewModel.isOnline.collectAsStateWithLifecycle()
+
     var showUpdateDialog by remember { mutableStateOf(false) }
     var showSettingsDialog by remember { mutableStateOf(false) }
 
-    var selectedItem by remember { mutableStateOf<MediaEntry?>(null) }
-    var activePlaylist by remember { mutableStateOf<List<MediaEntry>>(emptyList()) }
-
-    fun loadChannels(forceRefresh: Boolean = false) {
-        isLoading = true
-        coroutineScope.launch {
-            val (live, pluto, sky, movies, series) = CatalogRepository.loadAllCatalogs(context, forceRefresh = forceRefresh)
-            liveChannels = live
-            plutoChannels = pluto
-            skyChannels = sky
-            movieChannels = movies
-            seriesChannels = series
-            isLoading = false
-        }
-    }
-
-    // Initial load & silent update check
-    LaunchedEffect(Unit) {
-        loadChannels()
-
-        // Background update check
-        coroutineScope.launch(Dispatchers.IO) {
-            val updateResult = UpdateManager.checkForUpdates(context)
-            updateResult.onSuccess { info ->
-                if (info != null) {
-                    withContext(Dispatchers.Main) {
-                        availableUpdate = info
-                        Toast.makeText(
-                            context,
-                            "Merlin TV update v${info.version} available! Open Settings/Updates to install.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            }
-        }
-    }
-
     // Auto-reload when connection is restored if lists are empty
     LaunchedEffect(isOnline) {
-        if (isOnline && (liveChannels.isEmpty() && plutoChannels.isEmpty() && skyChannels.isEmpty())) {
-            loadChannels(forceRefresh = true)
+        if (isOnline) {
+            viewModel.autoReloadIfEmpty()
         }
     }
 
     // Main navigation router
-    if (selectedItem != null) {
+    val currentSelectedItem = selectedItem
+    if (currentSelectedItem != null) {
         PlayerScreen(
-            initialItem = selectedItem!!,
-            playlist = activePlaylist.ifEmpty { listOf(selectedItem!!) },
-            favoritesManager = favoritesManager,
-            onBack = { selectedItem = null }
+            initialItem = currentSelectedItem,
+            playlist = activePlaylist.ifEmpty { listOf(currentSelectedItem) },
+            favoritesManager = viewModel.favoritesManager,
+            onBack = { viewModel.clearSelection() }
         )
     } else {
-        val showSplash = isLoading && liveChannels.isEmpty() && plutoChannels.isEmpty() && skyChannels.isEmpty() && movieChannels.isEmpty()
+        val showSplash = !isSplashDone
         AnimatedContent(
             targetState = showSplash,
             transitionSpec = {
@@ -136,7 +81,9 @@ fun MerlinTvApp(
             label = "splashToHome"
         ) { isSplashVisible ->
             if (isSplashVisible) {
-                SplashScreen()
+                SplashScreen(
+                    onSkip = { viewModel.skipSplash() }
+                )
             } else {
                 HomeScreen(
                     liveChannels = liveChannels,
@@ -147,10 +94,9 @@ fun MerlinTvApp(
                     isLoading = isLoading,
                     isOnline = isOnline,
                     availableUpdate = availableUpdate,
-                    favoritesManager = favoritesManager,
+                    favoritesManager = viewModel.favoritesManager,
                     onSelectChannel = { item, playlist ->
-                        selectedItem = item
-                        activePlaylist = playlist
+                        viewModel.selectItem(item, playlist)
                     },
                     onOpenUpdateDialog = {
                         showUpdateDialog = true
@@ -159,7 +105,7 @@ fun MerlinTvApp(
                         showSettingsDialog = true
                     },
                     onRefreshChannels = {
-                        loadChannels(forceRefresh = true)
+                        viewModel.loadChannels(forceRefresh = true)
                     }
                 )
             }
@@ -178,7 +124,7 @@ fun MerlinTvApp(
         SettingsDialog(
             onDismiss = { showSettingsDialog = false },
             onPlaylistChanged = {
-                loadChannels(forceRefresh = true)
+                viewModel.loadChannels(forceRefresh = true)
             }
         )
     }

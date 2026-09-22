@@ -9,32 +9,15 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -42,13 +25,16 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.example.merlinmedia.data.FavoritesManager
 import com.example.merlinmedia.model.AspectRatioMode
-import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.player.ExoPlayerHelper
-import com.example.merlinmedia.ui.components.*
+import com.example.merlinmedia.ui.components.player.BufferingOrReconnectingOverlay
+import com.example.merlinmedia.ui.components.player.NumericChannelJumpOverlay
+import com.example.merlinmedia.ui.components.player.PlayerMiniGuideDrawer
+import com.example.merlinmedia.ui.components.player.PlayerOsdBottomDock
+import com.example.merlinmedia.ui.components.player.PlayerOsdHeader
+import com.example.merlinmedia.ui.components.player.StreamErrorRecoveryOverlay
 import com.example.merlinmedia.ui.dialogs.AudioAndSubtitleDialog
 import com.example.merlinmedia.ui.dialogs.SleepTimerDialog
-import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -70,17 +56,15 @@ fun PlayerScreen(
     var showAudioSubtitlesDialog by remember { mutableStateOf(false) }
     var sleepTimerRemainingMinutes by remember { mutableIntStateOf(0) }
     var playbackSpeed by remember { mutableFloatStateOf(1.0f) }
-    var miniGuideSearch by remember { mutableStateOf("") }
     var aspectMode by remember { mutableStateOf(AspectRatioMode.FIT) }
     var reconnectAttempt by remember { mutableIntStateOf(0) }
     var isAutoReconnecting by remember { mutableStateOf(false) }
-    
-    // Numeric Keypad Input State (e.g. user types "1", "0", "5" to jump to Ch. 105)
+
+    // Numeric Keypad Input State
     var numericChannelInput by remember { mutableStateOf("") }
     var numericKeyTimestamp by remember { mutableLongStateOf(0L) }
 
     val coroutineScope = rememberCoroutineScope()
-
     val favoriteIds by favoritesManager.favoriteIds.collectAsState()
     val isFavorite = favoriteIds.contains(currentItem.id)
 
@@ -106,7 +90,28 @@ fun PlayerScreen(
         }
     }
 
-    // Numeric keypad auto-jump timer (1.2s timeout after last keypress)
+    // Initialize ExoPlayer
+    val player = remember {
+        ExoPlayerHelper.createPlayer(context, lowLatencyMode = true)
+    }
+
+    fun playItem(item: MediaEntry, resetRetry: Boolean = true) {
+        currentItem = item
+        errorMessage = null
+        isBuffering = true
+        if (resetRetry) {
+            reconnectAttempt = 0
+            isAutoReconnecting = false
+        }
+        player.stop()
+        player.clearMediaItems()
+        player.setMediaItem(ExoPlayerHelper.buildMediaItem(item.url, item.title))
+        ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
+        player.prepare()
+        player.playWhenReady = true
+    }
+
+    // Numeric keypad auto-jump timer (1.2s timeout)
     LaunchedEffect(numericKeyTimestamp) {
         if (numericChannelInput.isNotEmpty()) {
             delay(1200L)
@@ -129,6 +134,7 @@ fun PlayerScreen(
                 sleepTimerRemainingMinutes -= 1
                 if (sleepTimerRemainingMinutes <= 0) {
                     isPlaying = false
+                    player.pause()
                 }
             }
         }
@@ -137,27 +143,6 @@ fun PlayerScreen(
     // Record to recent history immediately on channel change
     LaunchedEffect(currentItem) {
         favoritesManager.addToRecent(currentItem)
-    }
-
-    // Initialize ExoPlayer via ExoPlayerHelper
-    val player = remember {
-        ExoPlayerHelper.createPlayer(context, lowLatencyMode = true)
-    }
-
-    fun playItem(item: MediaEntry, resetRetry: Boolean = true) {
-        currentItem = item
-        errorMessage = null
-        isBuffering = true
-        if (resetRetry) {
-            reconnectAttempt = 0
-            isAutoReconnecting = false
-        }
-        player.stop()
-        player.clearMediaItems()
-        player.setMediaItem(ExoPlayerHelper.buildMediaItem(item.url, item.title))
-        ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
-        player.prepare()
-        player.playWhenReady = true
     }
 
     LaunchedEffect(Unit) {
@@ -178,10 +163,7 @@ fun PlayerScreen(
                         reconnectAttempt = 0
                         isAutoReconnecting = false
                     }
-                    Player.STATE_ENDED -> {
-                        isBuffering = false
-                    }
-                    Player.STATE_IDLE -> {
+                    Player.STATE_ENDED, Player.STATE_IDLE -> {
                         isBuffering = false
                     }
                 }
@@ -241,7 +223,6 @@ fun PlayerScreen(
             .onKeyEvent { event ->
                 if (event.type == KeyEventType.KeyDown) {
                     val keyCode = event.nativeKeyEvent.keyCode
-                    // Handle Numeric Keypad (0-9) Direct Channel Tuning
                     val digit = when (keyCode) {
                         KeyEvent.KEYCODE_0, KeyEvent.KEYCODE_NUMPAD_0 -> "0"
                         KeyEvent.KEYCODE_1, KeyEvent.KEYCODE_NUMPAD_1 -> "1"
@@ -367,123 +348,29 @@ fun PlayerScreen(
         )
 
         // Numeric Keypad Quick Jump Overlay
-        if (numericChannelInput.isNotEmpty()) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 24.dp, end = 32.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.85f))
-                    .border(2.dp, AccentSky, RoundedCornerShape(12.dp))
-                    .padding(horizontal = 24.dp, vertical = 14.dp)
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text("Ch. ", color = AccentSky, fontWeight = FontWeight.Bold, fontSize = 24.sp)
-                    Text(numericChannelInput, color = Color.White, fontWeight = FontWeight.ExtraBold, fontSize = 32.sp)
-                }
-            }
-        }
+        NumericChannelJumpOverlay(
+            channelInput = numericChannelInput,
+            modifier = Modifier.align(Alignment.TopEnd)
+        )
 
         // Buffering / Reconnecting Indicator
-        if ((isBuffering || isAutoReconnecting) && errorMessage == null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = SolidBarBg),
-                    shape = RoundedCornerShape(8.dp),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle)),
-                    modifier = Modifier.padding(16.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 20.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(14.dp)
-                    ) {
-                        CircularProgressIndicator(
-                            color = if (isAutoReconnecting) AccentGold else AccentSky,
-                            strokeWidth = 3.dp,
-                            modifier = Modifier.size(24.dp)
-                        )
-                        Text(
-                            text = if (isAutoReconnecting) "Reconnecting stream (Attempt $reconnectAttempt of 3)..." else "Buffering stream...",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.SemiBold,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    }
-                }
-            }
-        }
+        BufferingOrReconnectingOverlay(
+            isBuffering = isBuffering,
+            isAutoReconnecting = isAutoReconnecting,
+            reconnectAttempt = reconnectAttempt,
+            errorMessage = errorMessage
+        )
 
         // Error Recovery Overlay
-        if (errorMessage != null) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Card(
-                    shape = RoundedCornerShape(10.dp),
-                    colors = CardDefaults.cardColors(containerColor = SurfaceDark),
-                    border = CardDefaults.outlinedCardBorder().copy(brush = androidx.compose.ui.graphics.SolidColor(BorderSubtle)),
-                    modifier = Modifier.padding(32.dp).widthIn(max = 500.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = ErrorRed, modifier = Modifier.size(48.dp))
-                        Text(
-                            text = "Stream Unavailable",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                        Text(
-                            text = errorMessage ?: "The broadcast source is currently offline or unreachable.",
-                            color = TextSecondary,
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                        Row(
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            OutlinedButton(
-                                onClick = { playItem(currentItem) },
-                                shape = RoundedCornerShape(8.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Retry")
-                            }
-
-                            if (playlist.size > 1) {
-                                Button(
-                                    onClick = {
-                                        val nextIdx = (currentIndex + 1) % playlist.size
-                                        playItem(playlist[nextIdx])
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.weight(1f),
-                                    colors = ButtonDefaults.buttonColors(containerColor = PrimaryBlue)
-                                ) {
-                                    Icon(Icons.Default.SkipNext, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("Next Channel", color = Color.White, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-                }
+        StreamErrorRecoveryOverlay(
+            errorMessage = errorMessage,
+            hasNextChannel = playlist.size > 1,
+            onRetry = { playItem(currentItem) },
+            onNextChannel = {
+                val nextIdx = (currentIndex + 1) % playlist.size
+                playItem(playlist[nextIdx])
             }
-        }
+        )
 
         // On-Screen Display (OSD)
         AnimatedVisibility(
@@ -492,267 +379,51 @@ fun PlayerScreen(
             exit = fadeOut(animationSpec = tween(150))
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
-                // Top Header Solid Bar
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
-                        .background(SolidBarBg)
-                        .border(1.dp, BorderSubtle)
-                        .padding(horizontal = 24.dp, vertical = 12.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            IconButton(
-                                onClick = onBack,
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(CardSurface)
-                                    .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
-                            }
+                PlayerOsdHeader(
+                    currentItem = currentItem,
+                    isFavorite = isFavorite,
+                    sleepTimerRemainingMinutes = sleepTimerRemainingMinutes,
+                    onBack = onBack,
+                    onToggleFavorite = { favoritesManager.toggleFavorite(currentItem.id) },
+                    onOpenAudioSubtitles = { showAudioSubtitlesDialog = true },
+                    onOpenSleepTimer = { showSleepTimerDialog = true },
+                    onOpenMiniGuide = { showMiniGuide = true },
+                    modifier = Modifier.align(Alignment.TopCenter)
+                )
 
-                            Column {
-                                Text(
-                                    text = currentItem.title,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = TextPrimary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    if (currentItem.type == Kind.LIVE || currentItem.type == Kind.PLUTO || currentItem.type == Kind.SKY) {
-                                        Box(
-                                            modifier = Modifier
-                                                .clip(RoundedCornerShape(4.dp))
-                                                .background(LiveBadgeColor)
-                                                .padding(horizontal = 6.dp, vertical = 2.dp)
-                                        ) {
-                                            Text("LIVE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                    QualityBadge(quality = currentItem.quality.ifBlank { "1080p" })
-                                    if (currentItem.country.isNotBlank()) {
-                                        Text(currentItem.country, color = TextSecondary, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                    }
-                                    if (currentItem.group.isNotBlank()) {
-                                        Text("·  ${currentItem.group}", color = TextSecondary, fontSize = 12.sp)
-                                    }
-                                }
-                            }
+                PlayerOsdBottomDock(
+                    currentItem = currentItem,
+                    isPlaying = isPlaying,
+                    currentIndex = currentIndex,
+                    playlistSize = playlist.size,
+                    playbackSpeed = playbackSpeed,
+                    aspectMode = aspectMode,
+                    onTogglePlayPause = {
+                        if (player.isPlaying) player.pause() else player.play()
+                    },
+                    onPrevious = {
+                        val prevIdx = if (currentIndex - 1 < 0) playlist.size - 1 else currentIndex - 1
+                        playItem(playlist[prevIdx])
+                    },
+                    onNext = {
+                        val nextIdx = (currentIndex + 1) % playlist.size
+                        playItem(playlist[nextIdx])
+                    },
+                    onCycleSpeed = {
+                        val speeds = listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
+                        val nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.size
+                        playbackSpeed = speeds[nextIdx]
+                        ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
+                    },
+                    onCycleAspectRatio = {
+                        aspectMode = when (aspectMode) {
+                            AspectRatioMode.FIT -> AspectRatioMode.ZOOM
+                            AspectRatioMode.ZOOM -> AspectRatioMode.STRETCH
+                            AspectRatioMode.STRETCH -> AspectRatioMode.FIT
                         }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            // Audio & Subtitle Selector Button
-                            Button(
-                                onClick = { showAudioSubtitlesDialog = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = CardSurface),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, BorderSubtle)
-                            ) {
-                                Icon(Icons.Default.Subtitles, contentDescription = "Audio & Subtitles", tint = AccentSky, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text("Audio / CC", color = TextPrimary, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            }
-
-                            // Sleep Timer Indicator/Button
-                            Button(
-                                onClick = { showSleepTimerDialog = true },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = if (sleepTimerRemainingMinutes > 0) AccentGold.copy(alpha = 0.2f) else CardSurface
-                                ),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, if (sleepTimerRemainingMinutes > 0) AccentGold else BorderSubtle)
-                            ) {
-                                Icon(
-                                    Icons.Default.Bedtime,
-                                    contentDescription = "Sleep Timer",
-                                    tint = if (sleepTimerRemainingMinutes > 0) AccentGold else TextSecondary,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Text(
-                                    text = if (sleepTimerRemainingMinutes > 0) "${sleepTimerRemainingMinutes}m" else "Sleep Timer",
-                                    color = if (sleepTimerRemainingMinutes > 0) AccentGold else TextPrimary,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-
-                            // Mini Guide Toggle Button
-                            Button(
-                                onClick = { showMiniGuide = true },
-                                colors = ButtonDefaults.buttonColors(containerColor = CardSurface),
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, BorderSubtle)
-                            ) {
-                                Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Channel Guide", tint = AccentSky, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Guide", color = TextPrimary, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-                            }
-
-                            // Favorite Button
-                            IconButton(
-                                onClick = {
-                                    favoritesManager.toggleFavorite(currentItem.id)
-                                },
-                                modifier = Modifier
-                                    .size(40.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(CardSurface)
-                                    .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
-                            ) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                                    contentDescription = "Favorite",
-                                    tint = if (isFavorite) AccentGold else TextSecondary,
-                                    modifier = Modifier.size(22.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                // Bottom Controls Solid Dock
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.BottomCenter)
-                        .background(SolidBarBg)
-                        .border(1.dp, BorderSubtle)
-                        .padding(horizontal = 24.dp, vertical = 14.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Play/Pause and Skip Controls
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            if (playlist.size > 1) {
-                                IconButton(
-                                    onClick = {
-                                        val prevIdx = if (currentIndex - 1 < 0) playlist.size - 1 else currentIndex - 1
-                                        playItem(playlist[prevIdx])
-                                    },
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(CardSurface)
-                                        .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous Channel", tint = TextPrimary)
-                                }
-                            }
-
-                            IconButton(
-                                onClick = {
-                                    if (player.isPlaying) {
-                                        player.pause()
-                                    } else {
-                                        player.play()
-                                    }
-                                },
-                                modifier = Modifier
-                                    .size(48.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(PrimaryBlue)
-                            ) {
-                                Icon(
-                                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    contentDescription = if (isPlaying) "Pause" else "Play",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                            }
-
-                            if (playlist.size > 1) {
-                                IconButton(
-                                    onClick = {
-                                        val nextIdx = (currentIndex + 1) % playlist.size
-                                        playItem(playlist[nextIdx])
-                                    },
-                                    modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(CardSurface)
-                                        .border(1.dp, BorderSubtle, RoundedCornerShape(8.dp))
-                                ) {
-                                    Icon(Icons.Default.SkipNext, contentDescription = "Next Channel", tint = TextPrimary)
-                                }
-                            }
-                        }
-
-                        // Playback Speed (for VOD items) and Aspect Ratio
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            if (currentItem.isVod) {
-                                OutlinedButton(
-                                    onClick = {
-                                        val speeds = listOf(0.75f, 1.0f, 1.25f, 1.5f, 2.0f)
-                                        val nextIdx = (speeds.indexOf(playbackSpeed) + 1) % speeds.size
-                                        playbackSpeed = speeds[nextIdx]
-                                        ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
-                                    },
-                                    shape = RoundedCornerShape(8.dp),
-                                    border = BorderStroke(1.dp, BorderSubtle),
-                                    colors = ButtonDefaults.outlinedButtonColors(containerColor = CardSurface, contentColor = TextPrimary)
-                                ) {
-                                    Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(16.dp))
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text("${playbackSpeed}x", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                                }
-                            }
-
-                            if (playlist.size > 1) {
-                                Text(
-                                    text = "Channel ${currentIndex + 1} of ${playlist.size}",
-                                    color = TextSecondary,
-                                    fontWeight = FontWeight.Medium,
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
-                            }
-
-                            OutlinedButton(
-                                onClick = {
-                                    aspectMode = when (aspectMode) {
-                                        AspectRatioMode.FIT -> AspectRatioMode.ZOOM
-                                        AspectRatioMode.ZOOM -> AspectRatioMode.STRETCH
-                                        AspectRatioMode.STRETCH -> AspectRatioMode.FIT
-                                    }
-                                },
-                                shape = RoundedCornerShape(8.dp),
-                                border = BorderStroke(1.dp, BorderSubtle),
-                                colors = ButtonDefaults.outlinedButtonColors(containerColor = CardSurface, contentColor = TextPrimary)
-                            ) {
-                                Icon(Icons.Default.AspectRatio, contentDescription = null, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(aspectMode.label, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
+                    },
+                    modifier = Modifier.align(Alignment.BottomCenter)
+                )
             }
         }
 
@@ -762,95 +433,21 @@ fun PlayerScreen(
             enter = slideInHorizontally(initialOffsetX = { -it }) + fadeIn(animationSpec = tween(200)),
             exit = slideOutHorizontally(targetOffsetX = { -it }) + fadeOut(animationSpec = tween(200))
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .width(380.dp)
-                    .background(GlassSurfaceDark)
-                    .border(1.dp, GlassBorder)
-                    .padding(16.dp)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(PrimaryBlue),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(Icons.Default.LiveTv, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
-                            }
-                            Text(
-                                text = "Channel Guide",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = TextPrimary
-                            )
-                        }
-                        IconButton(onClick = { showMiniGuide = false }, modifier = Modifier.size(32.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Close", tint = TextSecondary)
-                        }
-                    }
-
-                    TvSearchBar(
-                        query = miniGuideSearch,
-                        onQueryChange = { miniGuideSearch = it },
-                        placeholderText = "Filter ${playlist.size} channels..."
-                    )
-
-                    val filteredMiniList = remember(miniGuideSearch, playlist) {
-                        if (miniGuideSearch.isBlank()) playlist
-                        else {
-                            val q = miniGuideSearch.trim().lowercase()
-                            playlist.filter {
-                                it.title.lowercase().contains(q) || it.group.lowercase().contains(q) || it.country.lowercase().contains(q)
-                            }
-                        }
-                    }
-
-                    LazyColumn(
-                        modifier = Modifier.fillMaxSize(),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        itemsIndexed(filteredMiniList, key = { index, it -> "${it.id}-${it.url}-$index" }) { index, item ->
-                            QuickChannelDrawerItem(
-                                item = item,
-                                channelNumber = 101 + index,
-                                isCurrentPlaying = item.id == currentItem.id || item.url == currentItem.url,
-                                isFavorite = favoritesManager.isFavorite(item.id),
-                                onToggleFavorite = {
-                                    favoritesManager.toggleFavorite(item.id)
-                                },
-                                onClick = {
-                                    playItem(item)
-                                    showMiniGuide = false
-                                }
-                            )
-                        }
-                    }
-                }
-            }
+            PlayerMiniGuideDrawer(
+                playlist = playlist,
+                currentItem = currentItem,
+                isFavorite = { favoritesManager.isFavorite(it) },
+                onToggleFavorite = { favoritesManager.toggleFavorite(it) },
+                onSelectItem = { playItem(it) },
+                onClose = { showMiniGuide = false }
+            )
         }
 
         // Sleep Timer Dialog
         if (showSleepTimerDialog) {
             SleepTimerDialog(
                 currentRemainingMinutes = sleepTimerRemainingMinutes,
-                onSetTimer = { mins ->
-                    sleepTimerRemainingMinutes = mins
-                },
+                onSetTimer = { mins -> sleepTimerRemainingMinutes = mins },
                 onDismiss = { showSleepTimerDialog = false }
             )
         }

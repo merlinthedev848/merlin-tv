@@ -4,6 +4,7 @@ import android.content.Context
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
@@ -12,6 +13,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.util.Collections
+import java.util.concurrent.Executors
+import timber.log.Timber
 
 data class AllCatalogsResult(
     val live: List<MediaEntry>,
@@ -24,6 +27,9 @@ data class AllCatalogsResult(
 object CatalogRepository {
 
     private const val CACHE_TTL_MS = 6 * 60 * 60 * 1000L // 6 hours
+
+    /** Bounded dispatcher limiting concurrent network calls to 4 threads */
+    private val boundedIO = Executors.newFixedThreadPool(4).asCoroutineDispatcher()
 
     val availableCountries = listOf(
         "UK" to "https://iptv-org.github.io/iptv/countries/uk.m3u",
@@ -52,7 +58,6 @@ object CatalogRepository {
     private const val SAMSUNG_ALL_PLAYLIST = "https://raw.githubusercontent.com/BuddyChewChew/app-m3u-generator/refs/heads/main/playlists/samsungtvplus_all.m3u"
     private const val XIAOMI_PLAYLIST = "https://www.apsattv.com/xiaomi.m3u"
     private const val RAKUTEN_UK_PLAYLIST = "https://www.apsattv.com/rakutentv-uk.m3u"
-    private const val WORLDWIDE_ALL_PLAYLIST = "https://iptv-org.github.io/iptv/index.m3u"
     private const val FREE_TV_PLAYLIST = "https://raw.githubusercontent.com/Free-TV/IPTV/master/playlist.m3u8"
     private const val PLEX_ALL_PLAYLIST = "https://i.mjh.nz/Plex/all.m3u8"
     const val PLEX_EPG_URL = "https://i.mjh.nz/Plex/all.xml"
@@ -336,15 +341,6 @@ object CatalogRepository {
                 }
             }
 
-            val worldwideTask = async(Dispatchers.IO) {
-                val body = fetchM3uContent(context, WORLDWIDE_ALL_PLAYLIST)
-                if (body.isNotBlank()) {
-                    M3uParser.parse(body, defaultCountry = "Global", defaultKind = Kind.LIVE, sourceLabel = "Worldwide")
-                } else {
-                    emptyList()
-                }
-            }
-
             val customTasks = context?.let { ctx ->
                 getCustomPlaylists(ctx).map { (name, url) ->
                     async(Dispatchers.IO) {
@@ -376,7 +372,6 @@ object CatalogRepository {
             comedyTask.await().forEach { processAndAdd(it) }
             autoTask.await().forEach { processAndAdd(it) }
             freeTvTask.await().forEach { processAndAdd(it) }
-            worldwideTask.await().forEach { processAndAdd(it) }
             customTasks.forEach { task ->
                 task.await().forEach { processAndAdd(it) }
             }
@@ -677,22 +672,47 @@ object CatalogRepository {
     }
 
     /**
-     * Parallel loader for all catalogs simultaneously.
+     * Instantly returns curated and locally cached channels with 0ms network latency.
      */
-    suspend fun loadAllCatalogs(context: Context? = null, forceRefresh: Boolean = false): AllCatalogsResult = coroutineScope {
-        val liveDeferred = async(Dispatchers.IO) { loadLive(context, forceRefresh) }
-        val plutoDeferred = async(Dispatchers.IO) { loadPluto(context, forceRefresh) }
-        val skyDeferred = async(Dispatchers.IO) { loadSky(context, forceRefresh) }
-        val moviesDeferred = async(Dispatchers.IO) { loadMovies(context, forceRefresh) }
-        val seriesDeferred = async(Dispatchers.IO) { loadSeries(context, forceRefresh) }
-
-        AllCatalogsResult(
-            live = liveDeferred.await(),
-            pluto = plutoDeferred.await(),
-            sky = skyDeferred.await(),
-            movies = moviesDeferred.await(),
-            series = seriesDeferred.await()
+    fun getInstantCatalogs(context: Context?): AllCatalogsResult {
+        val cachedLive = if (cachedLiveChannels.isNotEmpty()) cachedLiveChannels else (if (context != null) loadFromDiskCache(context, "live", ignoreTtl = true) else emptyList()).ifEmpty { curatedLiveChannels }
+        val cachedPluto = if (cachedPlutoChannels.isNotEmpty()) cachedPlutoChannels else (if (context != null) loadFromDiskCache(context, "pluto", ignoreTtl = true) else emptyList())
+        val cachedSky = if (cachedSkyChannels.isNotEmpty()) cachedSkyChannels else (if (context != null) loadFromDiskCache(context, "sky", ignoreTtl = true) else emptyList()).ifEmpty { curatedSkyChannels }
+        val cachedMovies = if (cachedMovieChannels.isNotEmpty()) cachedMovieChannels else (if (context != null) loadFromDiskCache(context, "movies", ignoreTtl = true) else emptyList()).ifEmpty { curatedMovies }
+        val cachedSeries = if (cachedSeriesChannels.isNotEmpty()) cachedSeriesChannels else (if (context != null) loadFromDiskCache(context, "series", ignoreTtl = true) else emptyList()).ifEmpty { curatedSeries }
+        return AllCatalogsResult(
+            live = cachedLive,
+            pluto = cachedPluto,
+            sky = cachedSky,
+            movies = cachedMovies,
+            series = cachedSeries
         )
+    }
+
+    /**
+     * Parallel loader for all catalogs simultaneously with full fault tolerance.
+     */
+    suspend fun loadAllCatalogs(context: Context? = null, forceRefresh: Boolean = false): AllCatalogsResult = withContext(boundedIO) {
+        runCatching {
+            coroutineScope {
+                val liveDeferred = async(boundedIO) { runCatching { loadLive(context, forceRefresh) }.getOrDefault(cachedLiveChannels.ifEmpty { curatedLiveChannels }) }
+                val plutoDeferred = async(boundedIO) { runCatching { loadPluto(context, forceRefresh) }.getOrDefault(cachedPlutoChannels) }
+                val skyDeferred = async(boundedIO) { runCatching { loadSky(context, forceRefresh) }.getOrDefault(cachedSkyChannels.ifEmpty { curatedSkyChannels }) }
+                val moviesDeferred = async(boundedIO) { runCatching { loadMovies(context, forceRefresh) }.getOrDefault(cachedMovieChannels.ifEmpty { curatedMovies }) }
+                val seriesDeferred = async(boundedIO) { runCatching { loadSeries(context, forceRefresh) }.getOrDefault(cachedSeriesChannels.ifEmpty { curatedSeries }) }
+
+                AllCatalogsResult(
+                    live = liveDeferred.await(),
+                    pluto = plutoDeferred.await(),
+                    sky = skyDeferred.await(),
+                    movies = moviesDeferred.await(),
+                    series = seriesDeferred.await()
+                )
+            }
+        }.getOrElse { error ->
+            Timber.e(error, "Failed to load all catalogs, falling back to instant catalogs")
+            getInstantCatalogs(context)
+        }
     }
 
     fun getCategories(entries: List<MediaEntry>): List<String> {
