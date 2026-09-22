@@ -1,8 +1,8 @@
 {
-  "version": "2.0.0",
-  "versionCode": 200,
-  "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/releases/download/v2.0.0/merlin-tv-2.0.0.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.0.0",
-  "releaseNotes": "Merlin TV v2.0.0: Complete Architectural & Performance Overhaul.\n- Upgraded to MVVM Architecture with Hilt Dependency Injection\n- Persistent Room Database for Favorites & Recently Watched History\n- Modular & Hardware-Accelerated UI Component Structure\n- Bounded 4-Thread Dispatcher for low-latency channel & catalog fetching\n- Production Timber Logging and Zero raw stack traces\n- Security Hardening with Stream URL Validation & Metadata Sanitization\n- Automated GitHub Actions CI/CD Pipeline & Optimized ProGuard/R8 rules",
-  "publishedAt": "2026-09-22T10:50:00Z"
+  "version": "2.0.1",
+  "versionCode": 201,
+  "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.0.1",
+  "releaseNotes": "Merlin TV v2.0.1: Expanded high-quality on-demand VOD library with feature films and episodic series links across Horror, Sci-Fi, Thriller, Comedy, and Animation genres.",
+  "publishedAt": "2026-09-22T19:45:00Z"
 }

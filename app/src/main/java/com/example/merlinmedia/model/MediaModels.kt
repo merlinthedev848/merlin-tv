@@ -32,6 +32,25 @@ enum class Kind {
     FAVORITES
 }
 
+enum class NavSection(val title: String) {
+    HOME("Home"),
+    HUB("Hubs"),
+    LIVE("Live TV"),
+    PLUTO("Pluto FAST"),
+    SKY("Sky Network"),
+    MOVIES("Movies"),
+    SERIES("TV Series"),
+    RADIO("Radio & Music"),
+    FAVORITES("Favorites")
+}
+
+enum class SortMode(val label: String) {
+    DEFAULT("Default"),
+    ALPHABETICAL("A-Z"),
+    QUALITY("Quality"),
+    COUNTRY("Country")
+}
+
 enum class AspectRatioMode(val label: String) {
     FIT("Fit (16:9)"),
     ZOOM("Zoom (Fill)"),
