@@ -9,6 +9,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -189,20 +191,44 @@ fun HomeTopBar(
                 )
             }
 
-            // Update Notification Icon
-            IconButton(
-                onClick = onOpenUpdateDialog,
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(if (availableUpdate != null) LiveBadgeColor else Color(0xFF1E293B))
-            ) {
-                Icon(
-                    imageVector = if (availableUpdate != null) Icons.Default.NotificationsActive else Icons.Default.NotificationsNone,
-                    contentDescription = "Updates",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
+            // Update Notification / Action Button
+            if (availableUpdate != null) {
+                Button(
+                    onClick = onOpenUpdateDialog,
+                    colors = ButtonDefaults.buttonColors(containerColor = LiveBadgeColor),
+                    shape = RoundedCornerShape(16.dp),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 2.dp),
+                    modifier = Modifier.height(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SystemUpdate,
+                        contentDescription = "Update Available",
+                        tint = Color.White,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = "UPDATE v${availableUpdate.version}",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.ExtraBold
+                    )
+                }
+            } else {
+                IconButton(
+                    onClick = onOpenUpdateDialog,
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF1E293B))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SystemUpdate,
+                        contentDescription = "Check for Updates",
+                        tint = Color.White,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
 
             // Favorites Heart Icon

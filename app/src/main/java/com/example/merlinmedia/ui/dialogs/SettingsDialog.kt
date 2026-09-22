@@ -30,7 +30,8 @@ import com.example.merlinmedia.updater.UpdateManager
 @Composable
 fun SettingsDialog(
     onDismiss: () -> Unit,
-    onPlaylistChanged: () -> Unit
+    onPlaylistChanged: () -> Unit,
+    onCheckForUpdates: () -> Unit = {}
 ) {
     val context = LocalContext.current
     var customPlaylists by remember { mutableStateOf(CatalogRepository.getCustomPlaylists(context)) }
@@ -255,21 +256,40 @@ fun SettingsDialog(
                     HorizontalDivider(color = CardSurface)
 
                     // About Application & Repository
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("ℹ️ Application Details", style = MaterialTheme.typography.titleMedium, color = PrimaryCyan, fontWeight = FontWeight.Bold)
                         Text("Version: v${BuildConfig.VERSION_NAME} (Build ${BuildConfig.VERSION_CODE})", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
                         Text("Repository: github.com/${UpdateManager.GITHUB_REPO}", color = TextSecondary, style = MaterialTheme.typography.bodyMedium)
 
-                        TextButton(
-                            onClick = {
-                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/${UpdateManager.GITHUB_REPO}"))
-                                context.startActivity(intent)
-                            },
-                            contentPadding = PaddingValues(0.dp)
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp), tint = PrimaryCyan)
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Visit GitHub Repository", color = PrimaryCyan)
+                            Button(
+                                onClick = {
+                                    onDismiss()
+                                    onCheckForUpdates()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryCyan),
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp), tint = Color.Black)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Check for Updates", color = Color.Black, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/${UpdateManager.GITHUB_REPO}"))
+                                    context.startActivity(intent)
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp), tint = PrimaryCyan)
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("GitHub Repository", color = PrimaryCyan, fontSize = 12.sp)
+                            }
                         }
                     }
                 }

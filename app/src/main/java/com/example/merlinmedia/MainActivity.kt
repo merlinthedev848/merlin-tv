@@ -125,6 +125,9 @@ fun MerlinTvApp(viewModel: MainViewModel) {
             onDismiss = { showSettingsDialog = false },
             onPlaylistChanged = {
                 viewModel.loadChannels(forceRefresh = true)
+            },
+            onCheckForUpdates = {
+                showUpdateDialog = true
             }
         )
     }
