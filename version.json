@@ -1,8 +1,8 @@
 {
-  "version": "2.0.2",
-  "versionCode": 202,
-  "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.0.2",
-  "releaseNotes": "Merlin TV v2.0.2: Prominent update notification badge in the Top Bar and direct Check for Updates access in Settings.",
-  "publishedAt": "2026-09-22T20:00:00Z"
+  "version": "2.0.3",
+  "versionCode": 203,
+  "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/releases/download/v2.0.3/merlin-tv-2.0.3.apk",
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.0.3",
+  "releaseNotes": "Merlin TV v2.0.3: Fixed VOD movie & series crashes, deduplicated curated catalog entries, reordered top navigation tabs logically, improved 5-column poster grid for TV, and refined top bar layout.",
+  "publishedAt": "2026-09-25T11:00:00Z"
 }

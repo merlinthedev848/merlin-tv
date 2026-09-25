@@ -253,7 +253,9 @@ fun HomeScreen(
                 favoritesManager.toggleFavorite(movie.id)
             },
             onPlay = {
-                onSelectChannel(movie, movieChannels)
+                // Pass a single-item playlist for VOD — never advance through the
+                // full mixed catalog which contains live streams that would crash.
+                onSelectChannel(movie, listOf(movie))
                 selectedMovieForDetails = null
             },
             onDismiss = { selectedMovieForDetails = null }
@@ -270,7 +272,9 @@ fun HomeScreen(
             item = series,
             allEpisodes = if (allEpisodesForSeries.isNotEmpty()) allEpisodesForSeries else listOf(series),
             onSelectEpisode = { ep ->
-                onSelectChannel(ep, seriesChannels)
+                // Pass a single-item playlist for VOD episodes — the mixed seriesChannels
+                // contains live IPTV entries that crash the player when advanced to.
+                onSelectChannel(ep, listOf(ep))
                 selectedSeriesForEpisodes = null
             },
             onDismiss = { selectedSeriesForEpisodes = null }

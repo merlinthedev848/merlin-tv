@@ -329,7 +329,11 @@ fun HomeHeroAndHubsSection(
             }
         }
 
-        val highlightItems = currentItems.take(20)
+        // Live TV Highlights grid — show only live/FAST/SKY channels here.
+        // Movies & Series have their own dedicated rows above this section.
+        val highlightItems = currentItems
+            .filter { it.type == Kind.LIVE || it.type == Kind.PLUTO || it.type == Kind.SKY }
+            .take(20)
         val chunkedRows = highlightItems.chunked(5)
         itemsIndexed(chunkedRows, key = { rowIndex, _ -> "home_grid_row_$rowIndex" }) { rowIndex, rowItems ->
             Row(

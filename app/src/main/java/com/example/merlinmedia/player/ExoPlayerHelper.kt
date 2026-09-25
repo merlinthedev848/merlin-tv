@@ -63,10 +63,23 @@ object ExoPlayerHelper {
             .setDisplayTitle(title)
             .build()
 
-        return MediaItem.Builder()
+        // Hint the MIME type so ExoPlayer doesn't have to probe the network
+        // to determine the container format — critical for .mp4 VOD files.
+        val mimeType = when {
+            url.contains(".mp4", ignoreCase = true) -> androidx.media3.common.MimeTypes.VIDEO_MP4
+            url.contains(".m3u8", ignoreCase = true) || url.contains(".m3u", ignoreCase = true) -> androidx.media3.common.MimeTypes.APPLICATION_M3U8
+            else -> null
+        }
+
+        val builder = MediaItem.Builder()
             .setUri(url)
             .setMediaId(url)
             .setMediaMetadata(metadata)
-            .build()
+
+        if (mimeType != null) {
+            builder.setMimeType(mimeType)
+        }
+
+        return builder.build()
     }
 }

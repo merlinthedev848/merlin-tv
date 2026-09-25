@@ -1210,7 +1210,7 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
-            id = "vod-movie-night-living-dead",
+            id = "vod-movie-night-living-dead-2",
             title = "Night of the Living Dead",
             url = "https://ia800301.us.archive.org/16/items/night_of_the_living_dead/night_of_the_living_dead_512kb.mp4",
             type = Kind.MOVIE,
@@ -1290,7 +1290,7 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
-            id = "vod-movie-tears-of-steel",
+            id = "vod-movie-tears-of-steel-2",
             title = "Tears of Steel",
             url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
             type = Kind.MOVIE,
@@ -1306,7 +1306,7 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
-            id = "vod-movie-big-buck-bunny",
+            id = "vod-movie-big-buck-bunny-2",
             title = "Big Buck Bunny (1080p FHD)",
             url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
             type = Kind.MOVIE,
@@ -1322,7 +1322,7 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
-            id = "vod-movie-sintel",
+            id = "vod-movie-sintel-2",
             title = "Sintel: The Dragon Quest",
             url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
             type = Kind.MOVIE,

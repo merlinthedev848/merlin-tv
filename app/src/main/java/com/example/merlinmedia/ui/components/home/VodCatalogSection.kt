@@ -115,7 +115,7 @@ fun VodCatalogSection(
             }
         }
 
-        // 6-Column 2:3 Poster Grid
+        // 5-Column 2:3 Poster Grid (matches live channels grid for visual consistency)
         if (items.isEmpty()) {
             Box(
                 modifier = Modifier
@@ -148,7 +148,7 @@ fun VodCatalogSection(
             }
         } else {
             LazyVerticalGrid(
-                columns = GridCells.Fixed(6),
+                columns = GridCells.Fixed(5),
                 horizontalArrangement = Arrangement.spacedBy(14.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier

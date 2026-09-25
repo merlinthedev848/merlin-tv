@@ -52,7 +52,7 @@ fun HomeTopBar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // App Branding
+        // ── App Branding ──────────────────────────────────────────────
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -88,7 +88,8 @@ fun HomeTopBar(
             }
         }
 
-        // Horizontal Navigation Menu Tabs
+        // ── Horizontal Navigation Tabs (logical media order) ──────────
+        // Order: Home → Live → Sky & News → Pluto TV → Movies → Series → Radio → Favorites
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -109,18 +110,6 @@ fun HomeTopBar(
                 onClick = { onSectionChange(NavSection.LIVE) }
             )
             TopNavBarItem(
-                icon = Icons.Default.PlayCircle,
-                label = "Movies",
-                isSelected = activeSection == NavSection.MOVIES,
-                onClick = { onSectionChange(NavSection.MOVIES) }
-            )
-            TopNavBarItem(
-                icon = Icons.Default.Movie,
-                label = "Series",
-                isSelected = activeSection == NavSection.SERIES,
-                onClick = { onSectionChange(NavSection.SERIES) }
-            )
-            TopNavBarItem(
                 icon = Icons.Default.Sensors,
                 label = "Sky & News",
                 isSelected = activeSection == NavSection.SKY,
@@ -133,39 +122,66 @@ fun HomeTopBar(
                 onClick = { onSectionChange(NavSection.PLUTO) }
             )
             TopNavBarItem(
+                icon = Icons.Default.PlayCircle,
+                label = "Movies",
+                isSelected = activeSection == NavSection.MOVIES,
+                onClick = { onSectionChange(NavSection.MOVIES) }
+            )
+            TopNavBarItem(
+                icon = Icons.Default.Movie,
+                label = "Series",
+                isSelected = activeSection == NavSection.SERIES,
+                onClick = { onSectionChange(NavSection.SERIES) }
+            )
+            TopNavBarItem(
                 icon = Icons.Default.Radio,
                 label = "Radio",
                 isSelected = activeSection == NavSection.RADIO,
                 onClick = { onSectionChange(NavSection.RADIO) }
             )
+            // Separator
+            Box(
+                modifier = Modifier
+                    .width(1.dp)
+                    .height(20.dp)
+                    .background(Color(0xFF334155))
+            )
+            // Favorites moved into nav tabs where it belongs logically
             TopNavBarItem(
-                icon = Icons.Default.GridView,
-                label = "Hub",
-                isSelected = activeSection == NavSection.HUB,
-                onClick = { onSectionChange(NavSection.HUB) }
+                icon = if (activeSection == NavSection.FAVORITES) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                label = "Favourites",
+                isSelected = activeSection == NavSection.FAVORITES,
+                onClick = { onSectionChange(NavSection.FAVORITES) }
             )
         }
 
-        // Right Quick Actions & Live Clock
+        // ── Right Quick Actions & Live Clock ──────────────────────────
+        // Clean minimal set: clock · sort · search · update · settings
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Text(
-                text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
-                color = TextPrimary,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(end = 4.dp)
-            )
+            // Live Clock
+            if (currentTime.isNotBlank()) {
+                Text(
+                    text = currentTime,
+                    color = TextPrimary,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(end = 2.dp)
+                )
+            }
 
-            // Sort Mode Button
+            // Sort Mode
             IconButton(
                 onClick = onCycleSortMode,
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(if (currentSortMode != SortMode.DEFAULT) AccentSky.copy(alpha = 0.3f) else Color(0xFF1E293B))
+                    .background(
+                        if (currentSortMode != SortMode.DEFAULT) AccentSky.copy(alpha = 0.3f)
+                        else Color(0xFF1E293B)
+                    )
             ) {
                 Icon(
                     Icons.AutoMirrored.Filled.Sort,
@@ -175,13 +191,15 @@ fun HomeTopBar(
                 )
             }
 
-            // Search Icon
+            // Search
             IconButton(
                 onClick = onToggleSearchBar,
                 modifier = Modifier
                     .size(32.dp)
                     .clip(CircleShape)
-                    .background(if (showSearchBar || hasSearchQuery) PrimaryBlue else Color(0xFF1E293B))
+                    .background(
+                        if (showSearchBar || hasSearchQuery) PrimaryBlue else Color(0xFF1E293B)
+                    )
             ) {
                 Icon(
                     Icons.Default.Search,
@@ -191,7 +209,7 @@ fun HomeTopBar(
                 )
             }
 
-            // Update Notification / Action Button
+            // Update — prominent button when available, quiet icon when not
             if (availableUpdate != null) {
                 Button(
                     onClick = onOpenUpdateDialog,
@@ -231,23 +249,7 @@ fun HomeTopBar(
                 }
             }
 
-            // Favorites Heart Icon
-            IconButton(
-                onClick = { onSectionChange(NavSection.FAVORITES) },
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(if (activeSection == NavSection.FAVORITES) AccentGold else Color(0xFF1E293B))
-            ) {
-                Icon(
-                    imageVector = if (activeSection == NavSection.FAVORITES) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                    contentDescription = "Favorites",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-
-            // Settings Gear Icon
+            // Settings
             IconButton(
                 onClick = onOpenSettingsDialog,
                 modifier = Modifier
@@ -255,7 +257,12 @@ fun HomeTopBar(
                     .clip(CircleShape)
                     .background(Color(0xFF1E293B))
             ) {
-                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = Color.White, modifier = Modifier.size(16.dp))
+                Icon(
+                    Icons.Default.Settings,
+                    contentDescription = "Settings",
+                    tint = Color.White,
+                    modifier = Modifier.size(16.dp)
+                )
             }
         }
     }

@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.merlinmedia"
         minSdk = 23
         targetSdk = 35
-        versionCode = 202
-        versionName = "2.0.2"
+        versionCode = 203
+        versionName = "2.0.3"
     }
 
     signingConfigs {
