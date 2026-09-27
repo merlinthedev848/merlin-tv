@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -34,7 +35,7 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 /**
- * High-end Classic Honeycomb Dashboard matching the clean IPTV TV-Box experience.
+ * High-end Classic Honeycomb Dashboard with Rounded Square (Squircle) Tiles.
  */
 @Composable
 fun ClassicTvDashboard(
@@ -76,64 +77,77 @@ fun ClassicTvDashboard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 32.dp, vertical = 20.dp),
+                .padding(horizontal = 28.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // ==========================================
-            // TOP BAR: Logo (Center) + Utility Icons (Right)
+            // TOP BAR: Logo (Left/Center) + Utility Icons (Right)
             // ==========================================
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Left spacer / clock
+                // Left: Online Indicator + Squircle Merlin TV Branding
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    // Rounded Squircle Merlin TV Logo Emblem
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(if (isOnline) Color(0xFF10B981) else Color(0xFFEF4444))
-                    )
-                    Text(
-                        text = if (isOnline) "ONLINE" else "OFFLINE",
-                        color = TextSecondary,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.sp
-                    )
-                }
-
-                // Center: Circular Merlin TV Logo Emblem
-                Box(
-                    modifier = Modifier
-                        .size(54.dp)
-                        .shadow(16.dp, CircleShape, spotColor = AccentSky)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                colors = listOf(Color(0xFF00B4D8), Color(0xFF0077B6), Color(0xFF90E0EF))
+                            .size(44.dp)
+                            .shadow(12.dp, RoundedCornerShape(12.dp), spotColor = AccentSky)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                Brush.linearGradient(
+                                    colors = listOf(Color(0xFF00B4D8), Color(0xFF0077B6), Color(0xFF03045E))
+                                )
                             )
+                            .border(1.5.dp, Color(0xFFCAF0F8), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = "Merlin TV",
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
                         )
-                        .border(2.dp, Color(0xFFCAF0F8), CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Modern play arrow symbol
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Merlin TV",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
+                    }
+
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                text = "MERLIN TV",
+                                color = Color.White,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Black,
+                                letterSpacing = 1.5.sp
+                            )
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isOnline) Color(0xFF10B981) else Color(0xFFEF4444))
+                            )
+                        }
+                        Text(
+                            text = if (isOnline) "ONLINE • HIGH SPEED" else "OFFLINE MODE",
+                            color = if (isOnline) AccentSky else Color(0xFFEF4444),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.8.sp
+                        )
+                    }
                 }
 
                 // Right: Action Icons Bar (Search, Timer, REC, Sports, VPN, MSG, UPDATE)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     // Search
                     TopActionIconButton(
@@ -181,18 +195,18 @@ fun ClassicTvDashboard(
                     if (availableUpdate != null) {
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
+                                .clip(RoundedCornerShape(8.dp))
                                 .background(LiveBadgeColor)
-                                .border(1.dp, Color.White, RoundedCornerShape(6.dp))
+                                .border(1.2.dp, Color.White, RoundedCornerShape(8.dp))
                                 .clickable { onOpenUpdate() }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .padding(horizontal = 10.dp, vertical = 6.dp)
                         ) {
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(4.dp)
                             ) {
-                                Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = Color.White, modifier = Modifier.size(14.dp))
-                                Text("UPDATE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                                Icon(Icons.Default.SystemUpdate, contentDescription = "Update", tint = Color.White, modifier = Modifier.size(15.dp))
+                                Text("UPDATE v${availableUpdate.version}", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
                             }
                         }
                     } else {
@@ -206,7 +220,7 @@ fun ClassicTvDashboard(
             }
 
             // ==========================================
-            // CENTER: 4 MAIN CIRCULAR HUBS
+            // CENTER: 4 MAIN ROUNDED SQUARE (SQUIRCLE) HUBS
             // LIVE TV | EPG | VOD | SERIES
             // ==========================================
             Row(
@@ -217,36 +231,44 @@ fun ClassicTvDashboard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // 1. LIVE TV
-                CircularHubCard(
+                SquircleHubCard(
                     title = "LIVE TV",
-                    icon = Icons.Default.Tv,
+                    subtitle = "1,500+ Live Channels",
+                    icon = Icons.Default.LiveTv,
+                    accentColor = Color(0xFF00B4D8),
                     onClick = { onOpenSection(NavSection.LIVE) }
                 )
 
                 // 2. EPG
-                CircularHubCard(
-                    title = "EPG",
-                    icon = Icons.Default.FormatListBulleted,
+                SquircleHubCard(
+                    title = "EPG GUIDE",
+                    subtitle = "Electronic Schedule",
+                    icon = Icons.AutoMirrored.Filled.FormatListBulleted,
+                    accentColor = Color(0xFF10B981),
                     onClick = { onOpenSection(NavSection.EPG) }
                 )
 
                 // 3. VOD (Movies)
-                CircularHubCard(
-                    title = "VOD",
+                SquircleHubCard(
+                    title = "VOD MOVIES",
+                    subtitle = "Feature Films",
                     icon = Icons.Default.MovieCreation,
+                    accentColor = Color(0xFFF59E0B),
                     onClick = { onOpenSection(NavSection.MOVIES) }
                 )
 
                 // 4. SERIES
-                CircularHubCard(
-                    title = "SERIES",
+                SquircleHubCard(
+                    title = "TV SERIES",
+                    subtitle = "Boxsets & Episodes",
                     icon = Icons.Default.VideoLibrary,
+                    accentColor = Color(0xFF8B5CF6),
                     onClick = { onOpenSection(NavSection.SERIES) }
                 )
             }
 
             // ==========================================
-            // BOTTOM BAR: Pill Buttons
+            // BOTTOM BAR: Rounded Rectangle Pill Buttons
             // [ACCOUNT] [MULTI] [CATCH UP] ... [FAVORITE] [RADIO] [SETTINGS]
             // ==========================================
             Row(
@@ -259,9 +281,9 @@ fun ClassicTvDashboard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    BottomPillButton(label = "ACCOUNT", onClick = onOpenAccount)
-                    BottomPillButton(label = "MULTI", onClick = { onOpenSection(NavSection.LIVE) })
-                    BottomPillButton(label = "CATCH UP", onClick = onOpenCatchUp)
+                    BottomPillButton(label = "ACCOUNT", icon = Icons.Default.AccountCircle, onClick = onOpenAccount)
+                    BottomPillButton(label = "MULTI", icon = Icons.Default.GridView, onClick = { onOpenSection(NavSection.LIVE) })
+                    BottomPillButton(label = "CATCH UP", icon = Icons.Default.History, onClick = onOpenCatchUp)
                 }
 
                 // Bottom Right: FAVORITE, RADIO, SETTINGS
@@ -269,9 +291,9 @@ fun ClassicTvDashboard(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    BottomPillButton(label = "FAVORITE", onClick = { onOpenSection(NavSection.FAVORITES) })
-                    BottomPillButton(label = "RADIO", onClick = { onOpenSection(NavSection.RADIO) })
-                    BottomPillButton(label = "SETTINGS", onClick = onOpenSettings)
+                    BottomPillButton(label = "FAVORITE", icon = Icons.Default.Favorite, onClick = { onOpenSection(NavSection.FAVORITES) })
+                    BottomPillButton(label = "RADIO", icon = Icons.Default.Radio, onClick = { onOpenSection(NavSection.RADIO) })
+                    BottomPillButton(label = "SETTINGS", icon = Icons.Default.Settings, onClick = onOpenSettings)
                 }
             }
         }
@@ -279,67 +301,101 @@ fun ClassicTvDashboard(
 }
 
 /**
- * Large circular outline hub button with D-Pad focus animation, glowing borders, and icon.
+ * High-end Rounded Square (Squircle) Hub Card with D-Pad focus animation, glowing borders, and subtitle.
  */
 @Composable
-fun CircularHubCard(
+fun SquircleHubCard(
     title: String,
+    subtitle: String,
     icon: ImageVector,
+    accentColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isFocused by interactionSource.collectIsFocusedAsState()
 
-    val scale by animateFloatAsState(targetValue = if (isFocused) 1.10f else 1.0f, label = "hubScale")
-    val borderColor = if (isFocused) AccentSky else Color(0x6694A3B8)
+    val scale by animateFloatAsState(targetValue = if (isFocused) 1.08f else 1.0f, label = "squircleScale")
+    val borderColor = if (isFocused) accentColor else Color(0x4464748B)
     val borderWidth = if (isFocused) 3.dp else 1.5.dp
+    val shape = RoundedCornerShape(20.dp)
+
     val bgBrush = if (isFocused) {
-        Brush.radialGradient(
-            colors = listOf(Color(0x5500B4D8), Color(0x330077B6), Color(0x1A090D15))
+        Brush.verticalGradient(
+            colors = listOf(
+                accentColor.copy(alpha = 0.35f),
+                Color(0x331E293B),
+                Color(0x550F172A)
+            )
         )
     } else {
-        Brush.radialGradient(
-            colors = listOf(Color(0x221E293B), Color(0x110F172A), Color(0x05000000))
+        Brush.verticalGradient(
+            colors = listOf(
+                Color(0x221E293B),
+                Color(0x160F172A),
+                Color(0x0A020617)
+            )
         )
     }
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    Box(
         modifier = modifier
+            .width(185.dp)
+            .height(175.dp)
             .scale(scale)
+            .shadow(if (isFocused) 22.dp else 4.dp, shape, spotColor = accentColor)
+            .clip(shape)
+            .background(bgBrush)
+            .border(borderWidth, borderColor, shape)
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
+            .padding(14.dp),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(145.dp)
-                .shadow(if (isFocused) 20.dp else 4.dp, CircleShape, spotColor = AccentSky)
-                .clip(CircleShape)
-                .background(bgBrush)
-                .border(borderWidth, borderColor, CircleShape),
-            contentAlignment = Alignment.Center
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            Box(
+                modifier = Modifier
+                    .size(64.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(
+                        if (isFocused) {
+                            Brush.linearGradient(listOf(accentColor, accentColor.copy(alpha = 0.7f)))
+                        } else {
+                            Brush.linearGradient(listOf(Color(0x33334155), Color(0x221E293B)))
+                        }
+                    )
+                    .border(1.dp, if (isFocused) Color.White.copy(alpha = 0.6f) else Color(0x3394A3B8), RoundedCornerShape(16.dp)),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = title,
-                    tint = if (isFocused) Color.White else Color(0xFFCBD5E1),
-                    modifier = Modifier.size(52.dp)
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = title,
-                    color = if (isFocused) Color.White else Color(0xFFCBD5E1),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    letterSpacing = 1.2.sp
+                    tint = if (isFocused) Color.White else Color(0xFFE2E8F0),
+                    modifier = Modifier.size(36.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = title,
+                color = if (isFocused) Color.White else Color(0xFFF1F5F9),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.ExtraBold,
+                letterSpacing = 1.sp
+            )
+
+            Spacer(modifier = Modifier.height(2.dp))
+
+            Text(
+                text = subtitle,
+                color = if (isFocused) accentColor else TextSecondary,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium
+            )
         }
     }
 }
@@ -359,12 +415,12 @@ fun TopActionIconButton(
 
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(8.dp))
             .background(if (isFocused) PrimaryBlue else Color(0x221E293B))
-            .border(1.dp, if (isFocused) AccentSky else Color(0x44475569), RoundedCornerShape(6.dp))
+            .border(1.dp, if (isFocused) AccentSky else Color(0x44475569), RoundedCornerShape(8.dp))
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
-            .padding(horizontal = 8.dp, vertical = 5.dp),
+            .padding(horizontal = 9.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(
@@ -377,11 +433,11 @@ fun TopActionIconButton(
                 tint = if (isFocused) Color.White else Color(0xFFCBD5E1),
                 modifier = Modifier.size(16.dp)
             )
-            if (label.length <= 6) {
+            if (label.length <= 8) {
                 Text(
                     text = label,
                     color = if (isFocused) Color.White else Color(0xFFCBD5E1),
-                    fontSize = 10.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
@@ -390,11 +446,12 @@ fun TopActionIconButton(
 }
 
 /**
- * Bottom outline pill button (e.g. ACCOUNT, MULTI, CATCH UP, FAVORITE, RADIO, SETTINGS)
+ * Bottom outline rounded rectangle pill button with icon (e.g. ACCOUNT, MULTI, CATCH UP, FAVORITE, RADIO, SETTINGS)
  */
 @Composable
 fun BottomPillButton(
     label: String,
+    icon: ImageVector,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -406,21 +463,32 @@ fun BottomPillButton(
     Box(
         modifier = modifier
             .scale(scale)
-            .clip(RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(10.dp))
             .background(if (isFocused) PrimaryBlue else Color(0x220F172A))
-            .border(1.2.dp, if (isFocused) AccentSky else Color(0x66475569), RoundedCornerShape(6.dp))
+            .border(1.2.dp, if (isFocused) AccentSky else Color(0x66475569), RoundedCornerShape(10.dp))
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null) { onClick() }
-            .padding(horizontal = 16.dp, vertical = 7.dp),
+            .padding(horizontal = 14.dp, vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        Text(
-            text = label,
-            color = if (isFocused) Color.White else Color(0xFFE2E8F0),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (isFocused) Color.White else Color(0xFF94A3B8),
+                modifier = Modifier.size(15.dp)
+            )
+            Text(
+                text = label,
+                color = if (isFocused) Color.White else Color(0xFFE2E8F0),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 0.8.sp
+            )
+        }
     }
 }
 
