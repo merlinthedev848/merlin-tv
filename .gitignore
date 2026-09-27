@@ -14,3 +14,4 @@ app/build/
 jdk/
 decoded_apk/
 decoded_apk_full/
+.kotlin/

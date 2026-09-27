@@ -32,6 +32,7 @@ import com.example.merlinmedia.ui.components.home.ClassicTvDashboard
 import com.example.merlinmedia.ui.components.home.HomeHeroAndHubsSection
 import com.example.merlinmedia.ui.components.home.HomeTopBar
 import com.example.merlinmedia.ui.components.home.LiveChannelSection
+import com.example.merlinmedia.ui.components.home.NetflixDashboard
 import com.example.merlinmedia.ui.components.home.VodCatalogSection
 import com.example.merlinmedia.ui.dialogs.AccountDialog
 import com.example.merlinmedia.ui.dialogs.CatchupDialog
@@ -326,11 +327,19 @@ fun HomeScreen(
     // TOP-LEVEL SCREEN RENDERING
     // ==========================================
     if (activeSection == NavSection.HOME) {
-        // Classic 4-Hub TV-Box Dashboard
-        ClassicTvDashboard(
+        // Netflix-Style Streaming Dashboard
+        NetflixDashboard(
             currentTime = currentTime,
             availableUpdate = availableUpdate,
             isOnline = isOnline,
+            movieChannels = movieChannels,
+            seriesChannels = seriesChannels,
+            liveChannels = liveChannels,
+            plutoChannels = plutoChannels,
+            skyChannels = skyChannels,
+            recentHistory = recentHistory,
+            favoriteIds = favoriteIds,
+            onToggleFavorite = { favoritesManager.toggleFavorite(it) },
             onOpenSection = { section ->
                 activeSection = section
                 selectedFilter = "All"
@@ -353,7 +362,10 @@ fun HomeScreen(
                 showNoticesDialog = true
             },
             onOpenUpdate = onOpenUpdateDialog,
-            onOpenSettings = onOpenSettingsDialog
+            onOpenSettings = onOpenSettingsDialog,
+            onSelectMovieForDetails = { selectedMovieForDetails = it },
+            onSelectSeriesForEpisodes = { selectedSeriesForEpisodes = it },
+            onSelectChannel = onSelectChannel
         )
     } else {
         // Sub-screen Layout with Top Navigation Bar & Sub-catalog View

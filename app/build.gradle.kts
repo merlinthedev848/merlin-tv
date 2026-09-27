@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.merlinmedia"
         minSdk = 23
         targetSdk = 35
-        versionCode = 210
-        versionName = "2.1.0"
+        versionCode = 220
+        versionName = "2.2.0"
     }
 
     signingConfigs {
@@ -115,5 +115,6 @@ dependencies {
     implementation("androidx.room:room-ktx:2.6.1")
     kapt("androidx.room:room-compiler:2.6.1")
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20231013")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

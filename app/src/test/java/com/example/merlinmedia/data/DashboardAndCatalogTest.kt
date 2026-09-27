@@ -121,4 +121,62 @@ class DashboardAndCatalogTest {
         assertEquals("SD", CatalogRepository.detectQuality("Old Broadcast SD 480p"))
         assertEquals("1080p", CatalogRepository.detectQuality("Standard Feed", defaultQuality = "1080p"))
     }
+
+    @Test
+    fun `verify ke1th streams tzujtv json parser`() {
+        val sampleJson = """
+            [
+                {
+                    "name": "How to Train Your Dragon (2025)",
+                    "type": "Movies",
+                    "logo": "https://image.tmdb.org/t/p/w600/sample.jpg",
+                    "category": "Fantasy",
+                    "streamUrl": "https://vidfast.pro/movie/1087192",
+                    "isEmbed": true
+                },
+                {
+                    "name": "Stranger Things (2025)",
+                    "type": "TV Series",
+                    "logo": "https://image.tmdb.org/t/p/w600/sample2.jpg",
+                    "category": "Sci-Fi",
+                    "streamUrl": "https://vidfast.pro/tv/66732",
+                    "isEmbed": true
+                }
+            ]
+        """.trimIndent()
+
+        val parsed = CatalogRepository.parseKe1thTzujtv(sampleJson)
+        assertEquals(2, parsed.size)
+        assertEquals("How to Train Your Dragon", parsed[0].title)
+        assertEquals("2025", parsed[0].year)
+        assertEquals(Kind.MOVIE, parsed[0].type)
+        assertEquals("Fantasy", parsed[0].genre)
+        assertTrue(parsed[0].isVod)
+
+        assertEquals("Stranger Things", parsed[1].title)
+        assertEquals(Kind.SERIES, parsed[1].type)
+        assertEquals("Sci-Fi", parsed[1].genre)
+    }
+
+    @Test
+    fun `verify ke1th streams channels json parser`() {
+        val sampleChannelsJson = """
+            [
+                {
+                    "name": "Stingray Music Hits",
+                    "type": "TV",
+                    "logo": "https://example.com/logo.png",
+                    "category": "Music",
+                    "streamUrl": "https://lotus.stingray.com/manifest/master.m3u8"
+                }
+            ]
+        """.trimIndent()
+
+        val parsed = CatalogRepository.parseKe1thChannels(sampleChannelsJson)
+        assertEquals(1, parsed.size)
+        assertEquals("Stingray Music Hits", parsed[0].title)
+        assertEquals(Kind.LIVE, parsed[0].type)
+        assertEquals("FAST | MUSIC", parsed[0].group)
+        assertEquals("https://lotus.stingray.com/manifest/master.m3u8", parsed[0].url)
+    }
 }

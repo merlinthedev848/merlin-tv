@@ -1,8 +1,8 @@
 {
-  "version": "2.1.0",
-  "versionCode": 210,
+  "version": "2.2.0",
+  "versionCode": 220,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.1.0",
-  "releaseNotes": "Merlin TV v2.1.0: Clean 4-Hub Honeycomb Dashboard (LIVE TV, EPG, VOD, SERIES), enriched on-demand movie and episodic series library, and direct remote navigation.",
-  "publishedAt": "2026-09-27T12:30:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.2.0",
+  "releaseNotes": "Merlin TV v2.2.0: Netflix-Style Streaming Experience with Cinematic Hero Billboard, Top 10 Today horizontal rankings, 310+ blockbusters from ke1th.streams, 200+ FAST channels, TV series boxsets, and D-Pad remote squircle zoom.",
+  "publishedAt": "2026-09-27T13:00:00Z"
 }

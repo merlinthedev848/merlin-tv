@@ -13,7 +13,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.shape.RoundedCornerShape
 
 // ─── Color Palette ───
-val BgDark = Color(0xFF0A0D14)
+val BgDark = Color(0xFF0F0F12)
+val NetflixRed = Color(0xFFE50914)
+val NetflixDark = Color(0xFF141414)
+val NetflixCard = Color(0xFF1E1E24)
+val NetflixFocusBorder = Color(0xFFE50914)
 val NavRailBg = Color(0xFF0F131C)
 val SurfaceDark = Color(0xFF141A26)
 val CardSurface = Color(0xFF182030)
@@ -25,7 +29,7 @@ val AccentSky = Color(0xFF38BDF8)
 val PrimaryCyan = Color(0xFF38BDF8)
 val SecondaryTeal = Color(0xFF0EA5E9)
 val AccentGold = Color(0xFFF59E0B)
-val LiveBadgeColor = Color(0xFFE63946)
+val LiveBadgeColor = Color(0xFFE50914)
 val ErrorRed = Color(0xFFFF334B)
 val TextPrimary = Color(0xFFF1F5F9)
 val TextSecondary = Color(0xFF94A3B8)

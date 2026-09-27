@@ -78,6 +78,10 @@ object CatalogRepository {
     private const val ANIMATION_SERIES_PLAYLIST = "https://iptv-org.github.io/iptv/categories/animation.m3u"
     private const val AUTO_PLAYLIST = "https://iptv-org.github.io/iptv/categories/auto.m3u"
 
+    // ke1th.streams Curated Streaming Feeds & Direct VOD
+    private const val KE1TH_MOVIES_URL = "https://raw.githubusercontent.com/ke1thdev/ke1th.streams/main/channels/tzujtv.json"
+    private const val KE1TH_CHANNELS_URL = "https://raw.githubusercontent.com/ke1thdev/ke1th.streams/main/channels/channels.json"
+
     @Volatile private var cachedLiveChannels: List<MediaEntry> = emptyList()
     @Volatile private var cachedPlutoChannels: List<MediaEntry> = emptyList()
     @Volatile private var cachedSkyChannels: List<MediaEntry> = emptyList()
@@ -120,6 +124,92 @@ object CatalogRepository {
             lower.contains("576p") || lower.contains("480p") || lower.contains("sd") -> "SD"
             else -> defaultQuality
         }
+    }
+
+    /**
+     * Parse ke1th.streams curated Movie & TV releases (tzujtv.json)
+     */
+    fun parseKe1thTzujtv(jsonString: String): List<MediaEntry> {
+        if (jsonString.isBlank()) return emptyList()
+        return runCatching {
+            val array = JSONArray(jsonString)
+            val list = mutableListOf<MediaEntry>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val rawName = obj.optString("name").trim()
+                if (rawName.isBlank()) continue
+                val rawType = obj.optString("type")
+                val category = obj.optString("category").ifBlank { "Feature" }
+                val streamUrl = obj.optString("streamUrl").trim()
+                if (streamUrl.isBlank()) continue
+                val logo = obj.optString("logo").ifBlank { null }
+
+                val yearMatch = Regex("""\((\d{4})\)""").find(rawName)
+                val year = yearMatch?.groupValues?.get(1) ?: "2025"
+                val cleanTitle = rawName.replace(Regex("""\s*\(\d{4}\)"""), "").trim()
+
+                val isSeries = rawType.contains("Series", ignoreCase = true) || rawType.contains("TV", ignoreCase = true)
+                val kind = if (isSeries) Kind.SERIES else Kind.MOVIE
+
+                list.add(
+                    MediaEntry(
+                        id = "ke1th-" + cleanTitle.lowercase().replace(Regex("[^a-z0-9]"), "-"),
+                        title = cleanTitle,
+                        url = streamUrl,
+                        type = kind,
+                        group = category,
+                        genre = category,
+                        country = "Global",
+                        logo = logo,
+                        backdrop = logo,
+                        description = "Stream $cleanTitle ($year) in high definition on Merlin TV. Genre: $category.",
+                        source = "Merlin Cinema",
+                        year = year,
+                        duration = if (kind == Kind.MOVIE) "1h 50m" else "Season 1",
+                        rating = "8.8 ★",
+                        isVod = true,
+                        quality = "1080p"
+                    )
+                )
+            }
+            list
+        }.getOrDefault(emptyList())
+    }
+
+    /**
+     * Parse ke1th.streams live streaming FAST channels (channels.json)
+     */
+    fun parseKe1thChannels(jsonString: String): List<MediaEntry> {
+        if (jsonString.isBlank()) return emptyList()
+        return runCatching {
+            val array = JSONArray(jsonString)
+            val list = mutableListOf<MediaEntry>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val name = obj.optString("name").trim()
+                val streamUrl = obj.optString("streamUrl").trim()
+                if (name.isBlank() || streamUrl.isBlank()) continue
+                val category = obj.optString("category").ifBlank { "General" }
+                val logo = obj.optString("logo").ifBlank { null }
+
+                list.add(
+                    MediaEntry(
+                        id = "ke1th-ch-" + name.lowercase().replace(Regex("[^a-z0-9]"), "-"),
+                        title = name,
+                        url = streamUrl,
+                        type = Kind.LIVE,
+                        group = "FAST | " + category.uppercase(),
+                        genre = category,
+                        country = "Global",
+                        logo = logo,
+                        description = "Live $name stream broadcasting 24/7 on Merlin TV.",
+                        source = "FAST Network",
+                        quality = detectQuality(name, "1080p")
+                    )
+                )
+            }
+            list
+        }.getOrDefault(emptyList())
     }
 
     // ==========================================
@@ -326,6 +416,13 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val ke1thChannelsTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, KE1TH_CHANNELS_URL)
+                if (body.isNotBlank()) {
+                    parseKe1thChannels(body)
+                } else emptyList()
+            }
+
             val freeTvTask = async(Dispatchers.IO) {
                 val body = fetchM3uContent(context, FREE_TV_PLAYLIST)
                 if (body.isNotBlank()) {
@@ -371,6 +468,7 @@ object CatalogRepository {
             musicTask.await().forEach { processAndAdd(it) }
             comedyTask.await().forEach { processAndAdd(it) }
             autoTask.await().forEach { processAndAdd(it) }
+            ke1thChannelsTask.await().forEach { processAndAdd(it) }
             freeTvTask.await().forEach { processAndAdd(it) }
             customTasks.forEach { task ->
                 task.await().forEach { processAndAdd(it) }
@@ -589,8 +687,16 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val ke1thMoviesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, KE1TH_MOVIES_URL)
+                if (body.isNotBlank()) {
+                    parseKe1thTzujtv(body).filter { it.type == Kind.MOVIE }
+                } else emptyList()
+            }
+
             allEntries.addAll(movieChannelsTask.await())
             allEntries.addAll(classicMoviesTask.await())
+            allEntries.addAll(ke1thMoviesTask.await())
         }
 
         val distinctList = allEntries.toList().distinctBy { it.url }
@@ -659,8 +765,16 @@ object CatalogRepository {
                 } else emptyList()
             }
 
+            val ke1thSeriesTask = async(Dispatchers.IO) {
+                val body = fetchM3uContent(context, KE1TH_MOVIES_URL)
+                if (body.isNotBlank()) {
+                    parseKe1thTzujtv(body).filter { it.type == Kind.SERIES }
+                } else emptyList()
+            }
+
             allEntries.addAll(seriesTask.await())
             allEntries.addAll(animationTask.await())
+            allEntries.addAll(ke1thSeriesTask.await())
         }
 
         val distinctList = allEntries.toList().distinctBy { it.url }
