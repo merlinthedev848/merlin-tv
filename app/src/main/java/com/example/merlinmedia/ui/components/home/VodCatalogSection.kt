@@ -7,7 +7,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -17,6 +17,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -115,8 +116,17 @@ fun VodCatalogSection(
             }
         }
 
+        // Dynamic distinct display items for Series vs Movies
+        val displayItems = remember(items, isSeries) {
+            if (isSeries) {
+                items.distinctBy { it.title.substringBefore(":").trim().lowercase() }
+            } else {
+                items
+            }
+        }
+
         // 6-Column 2:3 Poster Grid
-        if (items.isEmpty()) {
+        if (displayItems.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -157,12 +167,26 @@ fun VodCatalogSection(
                     .clipToBounds(),
                 contentPadding = PaddingValues(bottom = 16.dp)
             ) {
-                itemsIndexed(
-                    items = items,
-                    key = { index, it -> "vod-${if (isSeries) "series" else "movie"}-${it.id}-$index" }
-                ) { _, item ->
+                items(
+                    items = displayItems,
+                    key = { "vod-${if (isSeries) "series" else "movie"}-${it.id}" }
+                ) { item ->
+                    val cleanTitle = if (isSeries) item.title.substringBefore(":").trim() else item.title
+                    val episodeCountForShow = if (isSeries) {
+                        items.count { it.title.startsWith(cleanTitle, ignoreCase = true) || it.id.startsWith(item.id.substringBefore("-s1")) }
+                    } else null
+
+                    val itemToRender = if (isSeries) {
+                        item.copy(
+                            title = cleanTitle,
+                            duration = if (episodeCountForShow != null && episodeCountForShow > 1) "$episodeCountForShow Episodes" else item.duration
+                        )
+                    } else {
+                        item
+                    }
+
                     VodMovieCard(
-                        item = item,
+                        item = itemToRender,
                         isFavorite = favoriteIds.contains(item.id),
                         onToggleFavorite = {
                             onToggleFavorite(item.id)

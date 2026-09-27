@@ -1023,7 +1023,7 @@ object CatalogRepository {
             url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
             type = Kind.MOVIE,
             group = "Sci-Fi",
-            genre = "Sci-Fi, Action",
+            genre = "Sci-Fi, Action, VFX",
             year = "2024",
             duration = "1h 48m",
             rating = "8.4 ★",
@@ -1051,14 +1051,14 @@ object CatalogRepository {
         ),
         MediaEntry(
             id = "vod-movie-sintel",
-            title = "Sintel",
+            title = "Sintel: The Dragon Quest",
             url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
             type = Kind.MOVIE,
             group = "Fantasy",
             genre = "Fantasy, Adventure, Action",
             year = "2024",
             duration = "1h 42m",
-            rating = "8.5 ★",
+            rating = "8.8 ★",
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Sintel_poster.jpg/400px-Sintel_poster.jpg",
             backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80",
             description = "A fierce young warrior searches the treacherous snowy peaks and mystical lands for a baby dragon she raised after it is abducted by an elder beast.",
@@ -1071,7 +1071,7 @@ object CatalogRepository {
             url = "https://ia800300.us.archive.org/29/items/night_of_the_living_dead/night_of_the_living_dead_512kb.mp4",
             type = Kind.MOVIE,
             group = "Horror",
-            genre = "Horror, Thriller",
+            genre = "Horror, Thriller, Cult",
             year = "1968",
             duration = "1h 36m",
             rating = "8.9 ★",
@@ -1210,18 +1210,66 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
-            id = "vod-movie-night-living-dead",
-            title = "Night of the Living Dead",
-            url = "https://ia800301.us.archive.org/16/items/night_of_the_living_dead/night_of_the_living_dead_512kb.mp4",
+            id = "vod-movie-terror-by-night",
+            title = "Sherlock Holmes: Terror by Night",
+            url = "https://ia800300.us.archive.org/31/items/TerrorByNight1946_976/TerrorByNight_512kb.mp4",
             type = Kind.MOVIE,
-            group = "Horror",
-            genre = "Horror, Cult, Sci-Fi",
-            year = "1968",
-            duration = "1h 36m",
-            rating = "8.9 ★",
-            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/1/18/Night_of_the_Living_Dead_%281968%29_poster.jpg/400px-Night_of_the_Living_Dead_%281968%29_poster.jpg",
-            backdrop = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=800&q=80",
-            description = "George A. Romero's iconic horror masterpiece. A disparate group of individuals seeks refuge in an abandoned farmhouse while defending against undead ghouls.",
+            group = "Thriller",
+            genre = "Mystery, Crime, Detective",
+            year = "1946",
+            duration = "1h 00m",
+            rating = "8.4 ★",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6d/Terror_by_night_poster.jpg/400px-Terror_by_night_poster.jpg",
+            backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+            description = "Sherlock Holmes is hired to guard the fabulous 'Star of Rhodesia' diamond aboard a speeding train from London to Edinburgh when a murder occurs.",
+            source = "Classic Cinema Vault",
+            isVod = true
+        ),
+        MediaEntry(
+            id = "vod-movie-the-woman-in-green",
+            title = "Sherlock Holmes: The Woman in Green",
+            url = "https://ia800302.us.archive.org/2/items/The_Woman_In_Green/The_Woman_In_Green_512kb.mp4",
+            type = Kind.MOVIE,
+            group = "Thriller",
+            genre = "Mystery, Crime, Detective",
+            year = "1945",
+            duration = "1h 08m",
+            rating = "8.2 ★",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/The_Woman_in_Green_poster.jpg/400px-The_Woman_in_Green_poster.jpg",
+            backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+            description = "Holmes and Watson investigate a series of bizarre murders in London where victims have their right forefingers severed, leading them into Professor Moriarty's web.",
+            source = "Classic Cinema Vault",
+            isVod = true
+        ),
+        MediaEntry(
+            id = "vod-movie-the-stranger",
+            title = "The Stranger",
+            url = "https://ia800300.us.archive.org/15/items/TheStranger1946/TheStranger1946_512kb.mp4",
+            type = Kind.MOVIE,
+            group = "Thriller",
+            genre = "Film Noir, Mystery, Drama",
+            year = "1946",
+            duration = "1h 35m",
+            rating = "8.6 ★",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/a/ad/The_Stranger_%281946_poster%29.jpg/400px-The_Stranger_%281946_poster%29.jpg",
+            backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+            description = "Directed by and starring Orson Welles with Edward G. Robinson. A war crimes investigator pursues an escaped mastermind living under an assumed identity in a quiet Connecticut town.",
+            source = "Classic Cinema Vault",
+            isVod = true
+        ),
+        MediaEntry(
+            id = "vod-movie-scarlet-street",
+            title = "Scarlet Street",
+            url = "https://ia800301.us.archive.org/14/items/ScarletStreet1945/ScarletStreet1945_512kb.mp4",
+            type = Kind.MOVIE,
+            group = "Drama",
+            genre = "Film Noir, Drama, Crime",
+            year = "1945",
+            duration = "1h 42m",
+            rating = "8.7 ★",
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/77/Scarlet_Street_poster.jpg/400px-Scarlet_Street_poster.jpg",
+            backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+            description = "Fritz Lang's brilliant film noir masterpiece starring Edward G. Robinson and Joan Bennett. An amateur painter gets entangled in a web of deceit, greed, and murder.",
             source = "Classic Cinema Vault",
             isVod = true
         ),
@@ -1290,54 +1338,6 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
-            id = "vod-movie-tears-of-steel",
-            title = "Tears of Steel",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-            type = Kind.MOVIE,
-            group = "Sci-Fi",
-            genre = "Sci-Fi, Action, VFX",
-            year = "2012",
-            duration = "12m",
-            rating = "8.4 ★",
-            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/75/Tears_of_Steel_poster.jpg/400px-Tears_of_Steel_poster.jpg",
-            backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80",
-            description = "Open source sci-fi cinema showcasing high-end visual effects. A group of scientists and warriors in dystopian Amsterdam work to save the future of humanity.",
-            source = "Open Cinema Studio",
-            isVod = true
-        ),
-        MediaEntry(
-            id = "vod-movie-big-buck-bunny",
-            title = "Big Buck Bunny (1080p FHD)",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-            type = Kind.MOVIE,
-            group = "Animation",
-            genre = "Animation, Comedy, Family",
-            year = "2008",
-            duration = "10m",
-            rating = "8.5 ★",
-            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Big_buck_bunny_poster_big.jpg/400px-Big_buck_bunny_poster_big.jpg",
-            backdrop = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&q=80",
-            description = "A giant, gentle bunny decides to take revenge on three forest bullies who harass innocent butterflies and woodland creatures.",
-            source = "Open Cinema Studio",
-            isVod = true
-        ),
-        MediaEntry(
-            id = "vod-movie-sintel",
-            title = "Sintel: The Dragon Quest",
-            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
-            type = Kind.MOVIE,
-            group = "Animation",
-            genre = "Animation, Fantasy, Adventure",
-            year = "2010",
-            duration = "15m",
-            rating = "8.8 ★",
-            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Sintel_poster.jpg/400px-Sintel_poster.jpg",
-            backdrop = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&q=80",
-            description = "A lonely young woman named Sintel embarks on an epic and emotional journey across dangerous mountains and deserts to rescue her pet baby dragon.",
-            source = "Open Cinema Studio",
-            isVod = true
-        ),
-        MediaEntry(
             id = "vod-movie-last-man-on-earth",
             title = "The Last Man on Earth",
             url = "https://ia800303.us.archive.org/7/items/TheLastManOnEarth_1964/TheLastManOnEarth_1964_512kb.mp4",
@@ -1372,9 +1372,12 @@ object CatalogRepository {
     )
 
     val curatedSeries: List<MediaEntry> = listOf(
+        // ==========================================
+        // 1. THE BEVERLY HILLBILLIES (Seasons & Episodes)
+        // ==========================================
         MediaEntry(
             id = "vod-series-beverly-hillbillies-s1e1",
-            title = "The Beverly Hillbillies",
+            title = "The Beverly Hillbillies: S1:E1 The Clampetts Strike Oil",
             url = "https://ia800300.us.archive.org/1/items/Beverly_Hillbillies_1/Beverly_Hillbillies_1_512kb.mp4",
             type = Kind.SERIES,
             group = "Comedy",
@@ -1392,7 +1395,7 @@ object CatalogRepository {
         ),
         MediaEntry(
             id = "vod-series-beverly-hillbillies-s1e2",
-            title = "The Beverly Hillbillies",
+            title = "The Beverly Hillbillies: S1:E2 Getting Settled",
             url = "https://ia800300.us.archive.org/1/items/Beverly_Hillbillies_2/Beverly_Hillbillies_2_512kb.mp4",
             type = Kind.SERIES,
             group = "Comedy",
@@ -1409,11 +1412,33 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
+            id = "vod-series-beverly-hillbillies-s1e3",
+            title = "The Beverly Hillbillies: S1:E3 Meanwhile, Back at the Cabin",
+            url = "https://ia800300.us.archive.org/1/items/Beverly_Hillbillies_3/Beverly_Hillbillies_3_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Comedy",
+            genre = "Classic Sitcom, Comedy",
+            year = "1962",
+            duration = "25m",
+            rating = "8.4 ★",
+            season = 1,
+            episode = 3,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b3/Beverly_Hillbillies_cast.jpg/400px-Beverly_Hillbillies_cast.jpg",
+            backdrop = "https://images.unsplash.com/photo-1517604931442-7e0c8ed2963c?w=800&q=80",
+            description = "S1:E3 - 'Meanwhile, Back at the Cabin'. Jed and Granny get homesick and try to convince cousin Pearl to join them in California.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+
+        // ==========================================
+        // 2. BONANZA (Seasons & Episodes)
+        // ==========================================
+        MediaEntry(
             id = "vod-series-bonanza-s1e1",
-            title = "Bonanza",
+            title = "Bonanza: S1:E1 A Rose for Lotta",
             url = "https://ia800300.us.archive.org/31/items/Bonanza_Episode_1/Bonanza_Episode_1_512kb.mp4",
             type = Kind.SERIES,
-            group = "Drama",
+            group = "Western",
             genre = "Western, Action, Drama",
             year = "1959",
             duration = "49m",
@@ -1428,10 +1453,10 @@ object CatalogRepository {
         ),
         MediaEntry(
             id = "vod-series-bonanza-s1e2",
-            title = "Bonanza",
+            title = "Bonanza: S1:E2 Death on Sun Mountain",
             url = "https://ia800300.us.archive.org/31/items/Bonanza_Episode_2/Bonanza_Episode_2_512kb.mp4",
             type = Kind.SERIES,
-            group = "Drama",
+            group = "Western",
             genre = "Western, Action, Drama",
             year = "1959",
             duration = "48m",
@@ -1445,8 +1470,70 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
+            id = "vod-series-bonanza-s1e3",
+            title = "Bonanza: S1:E3 The Waterwich",
+            url = "https://ia800300.us.archive.org/31/items/Bonanza_Episode_3/Bonanza_Episode_3_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Western",
+            genre = "Western, Action, Drama",
+            year = "1959",
+            duration = "48m",
+            rating = "8.6 ★",
+            season = 1,
+            episode = 3,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Bonanza_Cast_1960.JPG/400px-Bonanza_Cast_1960.JPG",
+            backdrop = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
+            description = "S1:E3 - 'The Waterwitch'. Hoss Cartwright tries to protect a gentle German immigrant water dowser from enraged miners suffering through a severe drought.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+
+        // ==========================================
+        // 3. SHERLOCK HOLMES CLASSIC TV SERIES (1954)
+        // ==========================================
+        MediaEntry(
+            id = "vod-series-sherlock-1954-s1e1",
+            title = "Sherlock Holmes: S1:E1 Cunningham Heritage",
+            url = "https://ia800300.us.archive.org/19/items/SherlockHolmes1954Ep01/SherlockHolmes1954Ep01_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Crime",
+            genre = "Mystery, Crime, Detective",
+            year = "1954",
+            duration = "26m",
+            rating = "8.6 ★",
+            season = 1,
+            episode = 1,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Dressed_to_kill_poster.jpg/400px-Dressed_to_kill_poster.jpg",
+            backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+            description = "S1:E1 - Ronald Howard stars as Sherlock Holmes alongside Dr. John Watson as they investigate their very first case together at 221B Baker Street.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+        MediaEntry(
+            id = "vod-series-sherlock-1954-s1e2",
+            title = "Sherlock Holmes: S1:E2 Case of Lady Beryl",
+            url = "https://ia800300.us.archive.org/19/items/SherlockHolmes1954Ep02/SherlockHolmes1954Ep02_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Crime",
+            genre = "Mystery, Crime, Detective",
+            year = "1954",
+            duration = "26m",
+            rating = "8.5 ★",
+            season = 1,
+            episode = 2,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Dressed_to_kill_poster.jpg/400px-Dressed_to_kill_poster.jpg",
+            backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+            description = "S1:E2 - Holmes investigates a sensational high-society jewel burglary where a titled lady confesses to a murder she clearly did not commit.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+
+        // ==========================================
+        // 4. SUPERMAN ANIMATED CLASSIC (1941)
+        // ==========================================
+        MediaEntry(
             id = "vod-series-superman-s1e1",
-            title = "Superman Animated: The Mad Scientist",
+            title = "Superman: S1:E1 The Mad Scientist",
             url = "https://ia800201.us.archive.org/11/items/superman_1941/superman_1941_512kb.mp4",
             type = Kind.SERIES,
             group = "Animation",
@@ -1464,7 +1551,7 @@ object CatalogRepository {
         ),
         MediaEntry(
             id = "vod-series-superman-s1e2",
-            title = "Superman Animated: Mechanical Monsters",
+            title = "Superman: S1:E2 Mechanical Monsters",
             url = "https://ia800300.us.archive.org/28/items/mechanical_monsters/mechanical_monsters_512kb.mp4",
             type = Kind.SERIES,
             group = "Animation",
@@ -1482,7 +1569,7 @@ object CatalogRepository {
         ),
         MediaEntry(
             id = "vod-series-superman-s1e3",
-            title = "Superman Animated: Billion Dollar Limited",
+            title = "Superman: S1:E3 Billion Dollar Limited",
             url = "https://ia800300.us.archive.org/19/items/billion_dollar_limited/billion_dollar_limited_512kb.mp4",
             type = Kind.SERIES,
             group = "Animation",
@@ -1498,9 +1585,13 @@ object CatalogRepository {
             source = "Classic TV Series",
             isVod = true
         ),
+
+        // ==========================================
+        // 5. POPEYE THE SAILOR (1936)
+        // ==========================================
         MediaEntry(
             id = "vod-series-popeye-s1e1",
-            title = "Popeye: Meets Sinbad the Sailor",
+            title = "Popeye: S1:E1 Meets Sinbad the Sailor",
             url = "https://ia800300.us.archive.org/27/items/popeye_meets_sinbad_the_sailor/popeye_meets_sinbad_the_sailor_512kb.mp4",
             type = Kind.SERIES,
             group = "Animation",
@@ -1518,7 +1609,7 @@ object CatalogRepository {
         ),
         MediaEntry(
             id = "vod-series-popeye-s1e2",
-            title = "Popeye: Meets Ali Baba and the 40 Thieves",
+            title = "Popeye: S1:E2 Meets Ali Baba",
             url = "https://ia800300.us.archive.org/20/items/popeye_meets_ali_baba_and_his_forty_thieves/popeye_meets_ali_baba_and_his_forty_thieves_512kb.mp4",
             type = Kind.SERIES,
             group = "Animation",
@@ -1534,12 +1625,16 @@ object CatalogRepository {
             source = "Classic TV Series",
             isVod = true
         ),
+
+        // ==========================================
+        // 6. DRAGNET (1952)
+        // ==========================================
         MediaEntry(
             id = "vod-series-dragnet-s1e1",
-            title = "Dragnet",
+            title = "Dragnet: S1:E1 The Big Cast",
             url = "https://ia800300.us.archive.org/26/items/Dragnet_The_Big_Cast/Dragnet_The_Big_Cast_512kb.mp4",
             type = Kind.SERIES,
-            group = "Drama",
+            group = "Crime",
             genre = "Crime, Mystery, Police Procedural",
             year = "1952",
             duration = "26m",
@@ -1553,8 +1648,30 @@ object CatalogRepository {
             isVod = true
         ),
         MediaEntry(
+            id = "vod-series-dragnet-s1e2",
+            title = "Dragnet: S1:E2 The Big September Man",
+            url = "https://ia800300.us.archive.org/26/items/Dragnet_The_Big_September_Man/Dragnet_The_Big_September_Man_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Crime",
+            genre = "Crime, Mystery, Police Procedural",
+            year = "1952",
+            duration = "26m",
+            rating = "8.3 ★",
+            season = 1,
+            episode = 2,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/7/71/Dragnet_1952.JPG/400px-Dragnet_1952.JPG",
+            backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+            description = "S1:E2 - 'The Big September Man'. Friday and Smith investigate the brutal assault of a young woman at an LA roadside motel.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+
+        // ==========================================
+        // 7. FLASH GORDON (1940)
+        // ==========================================
+        MediaEntry(
             id = "vod-series-flash-gordon-s1e1",
-            title = "Flash Gordon Conquers the Universe",
+            title = "Flash Gordon: S1:E1 The Purple Death",
             url = "https://ia800300.us.archive.org/30/items/Flash_Gordon_Conquers_the_Universe_Ch1/Flash_Gordon_Conquers_the_Universe_Ch1_512kb.mp4",
             type = Kind.SERIES,
             group = "Sci-Fi",
@@ -1567,6 +1684,64 @@ object CatalogRepository {
             logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Flash_Gordon_Conquers_the_Universe_poster.jpg/400px-Flash_Gordon_Conquers_the_Universe_poster.jpg",
             backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80",
             description = "S1:E1 - 'The Purple Death'. Buster Crabbe stars as Flash Gordon as he rockets into deep space to battle the evil tyrant Ming the Merciless.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+        MediaEntry(
+            id = "vod-series-flash-gordon-s1e2",
+            title = "Flash Gordon: S1:E2 Freezing Torture",
+            url = "https://ia800300.us.archive.org/30/items/Flash_Gordon_Conquers_the_Universe_Ch2/Flash_Gordon_Conquers_the_Universe_Ch2_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Sci-Fi",
+            genre = "Sci-Fi, Space Opera, Action",
+            year = "1940",
+            duration = "20m",
+            rating = "8.5 ★",
+            season = 1,
+            episode = 2,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/d/db/Flash_Gordon_Conquers_the_Universe_poster.jpg/400px-Flash_Gordon_Conquers_the_Universe_poster.jpg",
+            backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80",
+            description = "S1:E2 - 'Freezing Torture'. Flash and Dr. Zarkov escape the frozen caverns of Mongo while seeking the antidote Polarite.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+
+        // ==========================================
+        // 8. THE LONE RANGER (1949)
+        // ==========================================
+        MediaEntry(
+            id = "vod-series-lone-ranger-s1e1",
+            title = "The Lone Ranger: S1:E1 Enter the Lone Ranger",
+            url = "https://ia800300.us.archive.org/14/items/TheLoneRangerEpisode1/TheLoneRangerEpisode1_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Western",
+            genre = "Western, Adventure, Classic",
+            year = "1949",
+            duration = "24m",
+            rating = "8.5 ★",
+            season = 1,
+            episode = 1,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/The_Lone_Ranger_1949.jpg/400px-The_Lone_Ranger_1949.jpg",
+            backdrop = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
+            description = "S1:E1 - 'Enter the Lone Ranger'. Clayton Moore stars as the sole surviving Texas Ranger who teams up with Tonto and his white stallion Silver to bring justice to the wild frontier.",
+            source = "Classic TV Series",
+            isVod = true
+        ),
+        MediaEntry(
+            id = "vod-series-lone-ranger-s1e2",
+            title = "The Lone Ranger: S1:E2 The Lone Ranger Fights On",
+            url = "https://ia800300.us.archive.org/14/items/TheLoneRangerEpisode2/TheLoneRangerEpisode2_512kb.mp4",
+            type = Kind.SERIES,
+            group = "Western",
+            genre = "Western, Adventure, Classic",
+            year = "1949",
+            duration = "24m",
+            rating = "8.4 ★",
+            season = 1,
+            episode = 2,
+            logo = "https://upload.wikimedia.org/wikipedia/commons/thumb/8/87/The_Lone_Ranger_1949.jpg/400px-The_Lone_Ranger_1949.jpg",
+            backdrop = "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=800&q=80",
+            description = "S1:E2 - 'The Lone Ranger Fights On'. The masked hero tracks down Cavendish and his gang of outlaws who ambushed the Texas Rangers.",
             source = "Classic TV Series",
             isVod = true
         )
