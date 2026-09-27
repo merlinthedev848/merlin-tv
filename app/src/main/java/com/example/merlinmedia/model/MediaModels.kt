@@ -36,6 +36,7 @@ enum class NavSection(val title: String) {
     HOME("Home"),
     HUB("Hubs"),
     LIVE("Live TV"),
+    EPG("EPG Guide"),
     PLUTO("Pluto FAST"),
     SKY("Sky Network"),
     MOVIES("Movies"),

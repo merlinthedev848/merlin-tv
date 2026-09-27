@@ -1,5 +1,6 @@
 package com.example.merlinmedia.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -27,10 +28,14 @@ import com.example.merlinmedia.model.UpdateInfo
 import com.example.merlinmedia.ui.components.SeriesEpisodeDialog
 import com.example.merlinmedia.ui.components.TvSearchBar
 import com.example.merlinmedia.ui.components.VodDetailsDialog
+import com.example.merlinmedia.ui.components.home.ClassicTvDashboard
 import com.example.merlinmedia.ui.components.home.HomeHeroAndHubsSection
 import com.example.merlinmedia.ui.components.home.HomeTopBar
 import com.example.merlinmedia.ui.components.home.LiveChannelSection
 import com.example.merlinmedia.ui.components.home.VodCatalogSection
+import com.example.merlinmedia.ui.dialogs.AccountDialog
+import com.example.merlinmedia.ui.dialogs.CatchupDialog
+import com.example.merlinmedia.ui.dialogs.NoticesDialog
 import com.example.merlinmedia.ui.theme.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -68,12 +73,23 @@ fun HomeScreen(
     var focusedItem by remember { mutableStateOf<MediaEntry?>(null) }
     var focusedIndex by remember { mutableIntStateOf(101) }
 
-    // VOD Dialog State
+    // Dialog States
     var selectedMovieForDetails by remember { mutableStateOf<MediaEntry?>(null) }
     var selectedSeriesForEpisodes by remember { mutableStateOf<MediaEntry?>(null) }
+    var showAccountDialog by remember { mutableStateOf(false) }
+    var showNoticesDialog by remember { mutableStateOf(false) }
+    var showCatchupDialog by remember { mutableStateOf(false) }
 
     // Hero Carousel Index
     var heroSlideIndex by remember { mutableIntStateOf(0) }
+
+    // Handle Back Press on TV remote: return to Home dashboard if inside any sub-catalog
+    if (activeSection != NavSection.HOME) {
+        BackHandler {
+            activeSection = NavSection.HOME
+            selectedFilter = "All"
+        }
+    }
 
     // Debounce search query to prevent stutter on 5,000+ item grids
     LaunchedEffect(searchQuery) {
@@ -175,7 +191,7 @@ fun HomeScreen(
     val currentItems = remember(activeSection, selectedFilter, debouncedSearchQuery, currentSortMode, liveChannels, plutoChannels, skyChannels, movieChannels, seriesChannels, favoriteIds) {
         val baseList = when (activeSection) {
             NavSection.HOME, NavSection.HUB -> skyChannels + plutoChannels.take(40) + liveChannels.take(40) + movieChannels.take(20)
-            NavSection.LIVE -> liveChannels
+            NavSection.LIVE, NavSection.EPG -> liveChannels
             NavSection.PLUTO -> plutoChannels
             NavSection.SKY -> skyChannels
             NavSection.MOVIES -> movieChannels
@@ -277,185 +293,250 @@ fun HomeScreen(
         )
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(BgDark)
-            .padding(horizontal = 20.dp, vertical = 12.dp)
-            .clipToBounds(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
-    ) {
-        // Offline Warning Banner
-        if (!isOnline) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFB91C1C))
-                    .padding(horizontal = 14.dp, vertical = 6.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Default.WifiOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                    Text(
-                        text = "You are currently offline. Showing cached channels and downloads.",
-                        color = Color.White,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
+    // Render Account / Status Dialog
+    if (showAccountDialog) {
+        val totalCount = liveChannels.size + plutoChannels.size + skyChannels.size + movieChannels.size + seriesChannels.size
+        AccountDialog(
+            totalChannelsCount = totalCount,
+            isOnline = isOnline,
+            onDismiss = { showAccountDialog = false }
+        )
+    }
 
-                Button(
-                    onClick = onRefreshChannels,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(6.dp),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                    modifier = Modifier.height(28.dp)
-                ) {
-                    Text("Retry", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                }
-            }
-        }
+    // Render Notices Dialog
+    if (showNoticesDialog) {
+        NoticesDialog(
+            onDismiss = { showNoticesDialog = false }
+        )
+    }
 
-        // Top Navigation Bar
-        HomeTopBar(
-            activeSection = activeSection,
-            onSectionChange = {
-                activeSection = it
+    // Render Catch Up Dialog
+    if (showCatchupDialog) {
+        CatchupDialog(
+            recentHistory = recentHistory,
+            onSelectChannel = { item ->
+                val allChannels = liveChannels + plutoChannels + skyChannels + movieChannels + seriesChannels
+                onSelectChannel(item, allChannels)
+            },
+            onDismiss = { showCatchupDialog = false }
+        )
+    }
+
+    // ==========================================
+    // TOP-LEVEL SCREEN RENDERING
+    // ==========================================
+    if (activeSection == NavSection.HOME) {
+        // Classic 4-Hub TV-Box Dashboard
+        ClassicTvDashboard(
+            currentTime = currentTime,
+            availableUpdate = availableUpdate,
+            isOnline = isOnline,
+            onOpenSection = { section ->
+                activeSection = section
                 selectedFilter = "All"
             },
-            currentTime = currentTime,
-            currentSortMode = currentSortMode,
-            onCycleSortMode = {
-                currentSortMode = when (currentSortMode) {
-                    SortMode.DEFAULT -> SortMode.ALPHABETICAL
-                    SortMode.ALPHABETICAL -> SortMode.QUALITY
-                    SortMode.QUALITY -> SortMode.COUNTRY
-                    SortMode.COUNTRY -> SortMode.DEFAULT
-                }
+            onOpenSearch = {
+                showSearchBar = true
+                activeSection = NavSection.LIVE
             },
-            showSearchBar = showSearchBar,
-            hasSearchQuery = searchQuery.isNotBlank(),
-            onToggleSearchBar = { showSearchBar = !showSearchBar },
-            availableUpdate = availableUpdate,
-            onOpenUpdateDialog = onOpenUpdateDialog,
-            onOpenSettingsDialog = onOpenSettingsDialog
+            onOpenSports = {
+                activeSection = NavSection.LIVE
+                selectedFilter = "Sports"
+            },
+            onOpenCatchUp = {
+                showCatchupDialog = true
+            },
+            onOpenAccount = {
+                showAccountDialog = true
+            },
+            onOpenNotices = {
+                showNoticesDialog = true
+            },
+            onOpenUpdate = onOpenUpdateDialog,
+            onOpenSettings = onOpenSettingsDialog
         )
-
-        // Expandable Search Bar
-        AnimatedVisibility(visible = showSearchBar) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clipToBounds(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (currentSortMode != SortMode.DEFAULT) {
-                    Text(
-                        text = "Sorting: ${currentSortMode.label}",
-                        color = AccentSky,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                } else {
-                    Spacer(modifier = Modifier.width(1.dp))
-                }
-
-                TvSearchBar(
-                    query = searchQuery,
-                    onQueryChange = { searchQuery = it },
-                    placeholderText = "Search channels, movies, sports...",
-                    modifier = Modifier.width(320.dp)
-                )
-            }
-        }
-
-        // Main Content Area
-        when (activeSection) {
-            NavSection.HOME, NavSection.HUB -> {
-                HomeHeroAndHubsSection(
-                    heroSlides = heroSlides,
-                    heroSlideIndex = heroSlideIndex,
-                    recentHistory = recentHistory,
-                    favoriteIds = favoriteIds,
-                    onToggleFavorite = { favoritesManager.toggleFavorite(it) },
-                    movieChannels = movieChannels,
-                    seriesChannels = seriesChannels,
-                    liveChannels = liveChannels,
-                    plutoChannels = plutoChannels,
-                    skyChannels = skyChannels,
-                    currentItems = currentItems,
-                    onSelectSection = {
-                        activeSection = it
-                        selectedFilter = "All"
-                    },
-                    onSelectMovieForDetails = { selectedMovieForDetails = it },
-                    onSelectSeriesForEpisodes = { selectedSeriesForEpisodes = it },
-                    onSelectChannel = onSelectChannel,
-                    onFocusChannel = { item, idx ->
-                        focusedItem = item
-                        focusedIndex = idx
+    } else {
+        // Sub-screen Layout with Top Navigation Bar & Sub-catalog View
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(BgDark)
+                .padding(horizontal = 20.dp, vertical = 12.dp)
+                .clipToBounds(),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Offline Warning Banner
+            if (!isOnline) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFFB91C1C))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(Icons.Default.WifiOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                        Text(
+                            text = "You are currently offline. Showing cached channels and downloads.",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
-                )
+
+                    Button(
+                        onClick = onRefreshChannels,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text("Retry", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
-            NavSection.MOVIES -> {
-                VodCatalogSection(
-                    title = "🎬 Movies (VOD On Demand)",
-                    subtitle = "Real on-demand feature films with synopses, ratings, and instant playback.",
-                    badgeText = "${currentItems.size} Films Available",
-                    badgeColor = PrimaryBlue,
-                    genres = movieFilterGenres,
-                    selectedFilter = selectedFilter,
-                    onSelectGenre = { selectedFilter = it },
-                    items = currentItems,
-                    favoriteIds = favoriteIds,
-                    onToggleFavorite = { favoritesManager.toggleFavorite(it) },
-                    onSelectItem = { selectedMovieForDetails = it },
-                    isSeries = false
-                )
+
+            // Top Navigation Bar
+            HomeTopBar(
+                activeSection = activeSection,
+                onSectionChange = {
+                    activeSection = it
+                    selectedFilter = "All"
+                },
+                currentTime = currentTime,
+                currentSortMode = currentSortMode,
+                onCycleSortMode = {
+                    currentSortMode = when (currentSortMode) {
+                        SortMode.DEFAULT -> SortMode.ALPHABETICAL
+                        SortMode.ALPHABETICAL -> SortMode.QUALITY
+                        SortMode.QUALITY -> SortMode.COUNTRY
+                        SortMode.COUNTRY -> SortMode.DEFAULT
+                    }
+                },
+                showSearchBar = showSearchBar,
+                hasSearchQuery = searchQuery.isNotBlank(),
+                onToggleSearchBar = { showSearchBar = !showSearchBar },
+                availableUpdate = availableUpdate,
+                onOpenUpdateDialog = onOpenUpdateDialog,
+                onOpenSettingsDialog = onOpenSettingsDialog
+            )
+
+            // Expandable Search Bar
+            AnimatedVisibility(visible = showSearchBar) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clipToBounds(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (currentSortMode != SortMode.DEFAULT) {
+                        Text(
+                            text = "Sorting: ${currentSortMode.label}",
+                            color = AccentSky,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    } else {
+                        Spacer(modifier = Modifier.width(1.dp))
+                    }
+
+                    TvSearchBar(
+                        query = searchQuery,
+                        onQueryChange = { searchQuery = it },
+                        placeholderText = "Search channels, movies, sports...",
+                        modifier = Modifier.width(320.dp)
+                    )
+                }
             }
-            NavSection.SERIES -> {
-                VodCatalogSection(
-                    title = "📺 TV Series (VOD On Demand)",
-                    subtitle = "Episodic television series on demand with full seasons and episode picker.",
-                    badgeText = "${currentItems.size} Series Available",
-                    badgeColor = Color(0xFF4F46E5),
-                    genres = seriesFilterGenres,
-                    selectedFilter = selectedFilter,
-                    onSelectGenre = { selectedFilter = it },
-                    items = currentItems,
-                    favoriteIds = favoriteIds,
-                    onToggleFavorite = { favoritesManager.toggleFavorite(it) },
-                    onSelectItem = { selectedSeriesForEpisodes = it },
-                    isSeries = true
-                )
-            }
-            else -> {
-                LiveChannelSection(
-                    focusedItem = focusedItem,
-                    focusedIndex = focusedIndex,
-                    categories = liveFilterCategories,
-                    countries = countriesList,
-                    countryCounts = countryCounts,
-                    selectedFilter = selectedFilter,
-                    onSelectFilter = { selectedFilter = it },
-                    items = currentItems,
-                    isLoading = isLoading,
-                    favoriteIds = favoriteIds,
-                    activeSection = activeSection,
-                    onToggleFavorite = { favoritesManager.toggleFavorite(it) },
-                    onFocusChannel = { item, idx ->
-                        focusedItem = item
-                        focusedIndex = idx
-                    },
-                    onSelectChannel = onSelectChannel
-                )
+
+            // Main Content Area
+            when (activeSection) {
+                NavSection.HUB -> {
+                    HomeHeroAndHubsSection(
+                        heroSlides = heroSlides,
+                        heroSlideIndex = heroSlideIndex,
+                        recentHistory = recentHistory,
+                        favoriteIds = favoriteIds,
+                        onToggleFavorite = { favoritesManager.toggleFavorite(it) },
+                        movieChannels = movieChannels,
+                        seriesChannels = seriesChannels,
+                        liveChannels = liveChannels,
+                        plutoChannels = plutoChannels,
+                        skyChannels = skyChannels,
+                        currentItems = currentItems,
+                        onSelectSection = {
+                            activeSection = it
+                            selectedFilter = "All"
+                        },
+                        onSelectMovieForDetails = { selectedMovieForDetails = it },
+                        onSelectSeriesForEpisodes = { selectedSeriesForEpisodes = it },
+                        onSelectChannel = onSelectChannel,
+                        onFocusChannel = { item, idx ->
+                            focusedItem = item
+                            focusedIndex = idx
+                        }
+                    )
+                }
+                NavSection.MOVIES -> {
+                    VodCatalogSection(
+                        title = "🎬 Movies (VOD On Demand)",
+                        subtitle = "Real on-demand feature films with synopses, ratings, and instant playback.",
+                        badgeText = "${currentItems.size} Films Available",
+                        badgeColor = PrimaryBlue,
+                        genres = movieFilterGenres,
+                        selectedFilter = selectedFilter,
+                        onSelectGenre = { selectedFilter = it },
+                        items = currentItems,
+                        favoriteIds = favoriteIds,
+                        onToggleFavorite = { favoritesManager.toggleFavorite(it) },
+                        onSelectItem = { selectedMovieForDetails = it },
+                        isSeries = false
+                    )
+                }
+                NavSection.SERIES -> {
+                    VodCatalogSection(
+                        title = "📺 TV Series (VOD On Demand)",
+                        subtitle = "Episodic television series on demand with full seasons and episode picker.",
+                        badgeText = "${currentItems.size} Series Available",
+                        badgeColor = Color(0xFF4F46E5),
+                        genres = seriesFilterGenres,
+                        selectedFilter = selectedFilter,
+                        onSelectGenre = { selectedFilter = it },
+                        items = currentItems,
+                        favoriteIds = favoriteIds,
+                        onToggleFavorite = { favoritesManager.toggleFavorite(it) },
+                        onSelectItem = { selectedSeriesForEpisodes = it },
+                        isSeries = true
+                    )
+                }
+                else -> {
+                    LiveChannelSection(
+                        focusedItem = focusedItem,
+                        focusedIndex = focusedIndex,
+                        categories = liveFilterCategories,
+                        countries = countriesList,
+                        countryCounts = countryCounts,
+                        selectedFilter = selectedFilter,
+                        onSelectFilter = { selectedFilter = it },
+                        items = currentItems,
+                        isLoading = isLoading,
+                        favoriteIds = favoriteIds,
+                        activeSection = activeSection,
+                        onToggleFavorite = { favoritesManager.toggleFavorite(it) },
+                        onFocusChannel = { item, idx ->
+                            focusedItem = item
+                            focusedIndex = idx
+                        },
+                        onSelectChannel = onSelectChannel
+                    )
+                }
             }
         }
     }
-}
+}

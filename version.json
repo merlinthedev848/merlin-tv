@@ -1,8 +1,8 @@
 {
-  "version": "2.0.2",
-  "versionCode": 202,
+  "version": "2.1.0",
+  "versionCode": 210,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.0.2",
-  "releaseNotes": "Merlin TV v2.0.2: Prominent update notification badge in the Top Bar and direct Check for Updates access in Settings.",
-  "publishedAt": "2026-09-22T20:00:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.1.0",
+  "releaseNotes": "Merlin TV v2.1.0: Clean 4-Hub Honeycomb Dashboard (LIVE TV, EPG, VOD, SERIES), enriched on-demand movie and episodic series library, and direct remote navigation.",
+  "publishedAt": "2026-09-27T12:30:00Z"
 }
