@@ -2,6 +2,7 @@ package com.example.merlinmedia.ui.components.home
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +25,10 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontFamily
@@ -39,7 +43,7 @@ import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.ui.theme.*
 
 /**
- * Netflix-Style Hero Spotlight Billboard with cinematic backdrop, rating metadata, and D-Pad focusable CTA buttons.
+ * Netflix-Style Hero Spotlight Billboard matching the mockup layout.
  */
 @Composable
 fun NetflixHeroBillboard(
@@ -62,7 +66,7 @@ fun NetflixHeroBillboard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(280.dp)
+            .height(300.dp)
             .clip(RoundedCornerShape(16.dp))
             .background(Color(0xFF0F0F12))
             .border(1.dp, Color(0x33E50914), RoundedCornerShape(16.dp))
@@ -117,10 +121,10 @@ fun NetflixHeroBillboard(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(0.68f),
+                modifier = Modifier.fillMaxWidth(0.72f),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Top Tag: "🔥 #1 ON MERLIN TV TODAY" or "⭐ MERLIN ORIGINAL"
+                // Top Tag: "TOP 10 #1 IN MOVIES TODAY"
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -141,19 +145,20 @@ fun NetflixHeroBillboard(
                     }
 
                     Text(
-                        text = "#1 in Movies & TV Series Today",
+                        text = "#1 IN MOVIES TODAY",
                         color = Color(0xFFFFE066),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
 
-                // Bold Cinematic Title
+                // Bold Cinematic Title (e.g. THE ALCHEMIST'S LEGACY)
                 Text(
-                    text = item.title,
+                    text = item.title.uppercase(),
                     color = Color.White,
-                    fontSize = 26.sp,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Black,
+                    letterSpacing = 1.1.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -163,36 +168,35 @@ fun NetflixHeroBillboard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    // Quality badge (4K / 1080p)
+                    // Quality badge (4K ULTRA HD / 1080p)
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(3.dp))
                             .background(Color(0xFF262626))
-                            .border(0.8.dp, Color(0xFF666666), RoundedCornerShape(3.dp))
-                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                            .border(0.8.dp, Color(0xFF888888), RoundedCornerShape(3.dp))
+                            .padding(horizontal = 6.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = if (item.quality.isNotBlank()) item.quality else "4K Ultra HD",
+                            text = if (item.quality.isNotBlank()) item.quality else "4K ULTRA HD",
                             color = Color.White,
                             fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold
                         )
                     }
 
-                    // Rating badge
-                    if (item.rating.isNotBlank()) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(3.dp)
-                        ) {
-                            Icon(Icons.Default.Star, contentDescription = null, tint = AccentGold, modifier = Modifier.size(13.dp))
-                            Text(
-                                text = item.rating,
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    // IMDb Rating badge (Yellow pill)
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(AccentGold)
+                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                    ) {
+                        Text(
+                            text = "IMDb ${if (item.rating.isNotBlank()) item.rating else "8.9"}",
+                            color = Color.Black,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Black
+                        )
                     }
 
                     // Release Year
@@ -219,7 +223,7 @@ fun NetflixHeroBillboard(
 
                 // Synopsis Summary
                 Text(
-                    text = if (item.description.isNotBlank()) item.description else "Stream this blockbuster title with full audio and subtitles directly on Merlin TV.",
+                    text = if (item.description.isNotBlank()) item.description else "A legendary wizard hunts a dangerous dark magic across centuries to protect a hidden world.",
                     color = Color(0xFFD4D4D8),
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
@@ -241,22 +245,22 @@ fun NetflixHeroBillboard(
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isPlayFocused) NetflixRed else Color.White
                     ),
-                    contentPadding = PaddingValues(horizontal = 22.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 24.dp, vertical = 8.dp),
                     modifier = Modifier
-                        .height(38.dp)
+                        .height(40.dp)
                         .scale(if (isPlayFocused) 1.06f else 1.0f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Play",
                         tint = if (isPlayFocused) Color.White else Color.Black,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "Play",
                         color = if (isPlayFocused) Color.White else Color.Black,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Black
                     )
                 }
@@ -271,24 +275,24 @@ fun NetflixHeroBillboard(
                     ),
                     border = androidx.compose.foundation.BorderStroke(
                         width = if (isInfoFocused) 2.dp else 1.dp,
-                        color = if (isInfoFocused) Color.White else Color(0x44FFFFFF)
+                        color = if (isInfoFocused) Color.White else Color(0x66FFFFFF)
                     ),
-                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 8.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp),
                     modifier = Modifier
-                        .height(38.dp)
+                        .height(40.dp)
                         .scale(if (isInfoFocused) 1.06f else 1.0f)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "More Info",
                         tint = Color.White,
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(18.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (item.type == Kind.SERIES) "Episodes & Info" else "More Info",
                         color = Color.White,
-                        fontSize = 13.sp,
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -298,7 +302,7 @@ fun NetflixHeroBillboard(
                     onClick = onToggleFavorite,
                     interactionSource = favInteractionSource,
                     modifier = Modifier
-                        .size(38.dp)
+                        .size(40.dp)
                         .scale(if (isFavFocused) 1.12f else 1.0f)
                         .clip(CircleShape)
                         .background(if (isFavFocused) Color(0xFF33333E) else Color(0x662B2B36))
@@ -321,7 +325,7 @@ fun NetflixHeroBillboard(
 }
 
 /**
- * Netflix Top 10 Poster Card with Giant Stylized Rank Number (1 through 10)
+ * Netflix Top 10 Poster Card with Giant Stylized Red Neon Outline Rank Number (1 through 10)
  */
 @Composable
 fun NetflixTop10PosterCard(
@@ -347,45 +351,67 @@ fun NetflixTop10PosterCard(
                 scaleX = scale
                 scaleY = scale
             }
-            .width(200.dp)
             .focusable(interactionSource = interactionSource)
             .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Giant Stylized Rank Number
+        // Giant Stylized Red Neon Outline Rank Number (Matching Mockup exactly)
         Box(
             modifier = Modifier
-                .width(65.dp)
-                .height(180.dp),
-            contentAlignment = Alignment.CenterEnd
+                .width(68.dp)
+                .height(175.dp),
+            contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "$rank",
-                color = if (isFocused) NetflixRed else Color(0xFF4B5563),
-                fontSize = 72.sp,
-                fontWeight = FontWeight.Black,
-                fontFamily = FontFamily.SansSerif,
-                textAlign = TextAlign.End,
-                modifier = Modifier.offset(x = 10.dp)
-            )
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                val strokePaint = Paint().asFrameworkPaint().apply {
+                    isAntiAlias = true
+                    textSize = 145f
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
+                    style = android.graphics.Paint.Style.STROKE
+                    strokeWidth = 10f
+                    color = android.graphics.Color.parseColor(if (isFocused) "#FF001E" else "#E50914")
+                }
+
+                val fillPaint = Paint().asFrameworkPaint().apply {
+                    isAntiAlias = true
+                    textSize = 145f
+                    typeface = android.graphics.Typeface.create(android.graphics.Typeface.SANS_SERIF, android.graphics.Typeface.BOLD)
+                    style = android.graphics.Paint.Style.FILL
+                    color = android.graphics.Color.parseColor("#141414")
+                }
+
+                val text = rank.toString()
+                val textBounds = android.graphics.Rect()
+                strokePaint.getTextBounds(text, 0, text.length, textBounds)
+
+                val x = (size.width - textBounds.width()) / 2f
+                val y = (size.height + textBounds.height()) / 2f
+
+                drawIntoCanvas { canvas ->
+                    canvas.nativeCanvas.drawText(text, x, y, fillPaint)
+                    canvas.nativeCanvas.drawText(text, x, y, strokePaint)
+                }
+            }
         }
 
-        // 2:3 Vertical Poster Card
+        // 2:3 Vertical Poster Card overlapping the rank number
         Box(
             modifier = Modifier
-                .width(130.dp)
-                .height(185.dp)
+                .width(125.dp)
+                .height(175.dp)
+                .offset(x = (-10).dp)
                 .clip(RoundedCornerShape(10.dp))
                 .background(NetflixCard)
                 .border(
-                    width = if (isFocused) 2.5.dp else 1.dp,
-                    color = if (isFocused) NetflixRed else Color(0x33475569),
+                    width = if (isFocused) 3.dp else 1.dp,
+                    color = if (isFocused) NetflixRed else Color(0x44E50914),
                     shape = RoundedCornerShape(10.dp)
                 )
         ) {
-            if (!item.logo.isNullOrBlank()) {
+            val imgUrl = item.logo ?: item.backdrop
+            if (!imgUrl.isNullOrBlank()) {
                 AsyncImage(
-                    model = item.logo,
+                    model = imgUrl,
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
@@ -442,17 +468,17 @@ fun NetflixTop10PosterCard(
 }
 
 /**
- * Reusable Horizontal Content Rail (Trending Now, TV Series, Action, Live TV, etc.)
+ * Netflix Horizontal Content Row with Neon Glow Borders for Movies & Shows
  */
 @Composable
 fun NetflixContentRow(
     title: String,
-    icon: ImageVector? = null,
-    badgeText: String? = null,
+    icon: ImageVector,
     items: List<MediaEntry>,
     favoriteIds: Set<String>,
     onToggleFavorite: (String) -> Unit,
     onSelectItem: (MediaEntry) -> Unit,
+    badgeText: String? = null,
     modifier: Modifier = Modifier
 ) {
     if (items.isEmpty()) return
@@ -460,10 +486,10 @@ fun NetflixContentRow(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Row Title & Badge
+        // Row Header Title
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -475,37 +501,58 @@ fun NetflixContentRow(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                if (icon != null) {
-                    Icon(icon, contentDescription = null, tint = NetflixRed, modifier = Modifier.size(16.dp))
-                }
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = NetflixRed,
+                    modifier = Modifier.size(18.dp)
+                )
                 Text(
                     text = title,
                     color = Color.White,
-                    fontSize = 15.sp,
+                    fontSize = 16.sp,
                     fontWeight = FontWeight.Bold,
                     letterSpacing = 0.3.sp
                 )
             }
 
-            if (badgeText != null) {
+            if (!badgeText.isNullOrBlank()) {
                 Text(
                     text = badgeText,
-                    color = AccentSky,
+                    color = Color(0xFFA1A1AA),
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold
                 )
             }
         }
 
-        // Horizontal Carousel of 2:3 Cards
+        // Horizontal Poster Rail
         LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
             contentPadding = PaddingValues(horizontal = 4.dp),
             modifier = Modifier.fillMaxWidth()
         ) {
-            itemsIndexed(items, key = { index, it -> "netflix-row-${it.id}-$index" }) { _, item ->
+            itemsIndexed(items, key = { index, it -> "rail-${it.id}-$index" }) { index, item ->
+                // Distinct glowing neon colors per title (Matrix Green, Dune Gold, Avengers Purple, Blade Runner Red, Oppenheimer Orange, etc.)
+                val neonGlow = remember(index, item.title) {
+                    when {
+                        item.title.contains("Matrix", ignoreCase = true) -> Color(0xFF00E676)
+                        item.title.contains("Dune", ignoreCase = true) -> Color(0xFFFFB800)
+                        item.title.contains("Avengers", ignoreCase = true) -> Color(0xFFB388FF)
+                        item.title.contains("Blade Runner", ignoreCase = true) -> Color(0xFFFF1744)
+                        item.title.contains("Oppenheimer", ignoreCase = true) -> Color(0xFFFF9100)
+                        item.title.contains("Interstellar", ignoreCase = true) -> Color(0xFF00E5FF)
+                        item.title.contains("Witcher", ignoreCase = true) -> Color(0xFF7C4DFF)
+                        else -> {
+                            val colors = listOf(Color(0xFFE50914), Color(0xFF00E5FF), Color(0xFFFFB800), Color(0xFF00E676), Color(0xFF9C27B0))
+                            colors[index % colors.size]
+                        }
+                    }
+                }
+
                 NetflixPosterCard(
                     item = item,
+                    neonGlowColor = neonGlow,
                     isFavorite = favoriteIds.contains(item.id),
                     onToggleFavorite = { onToggleFavorite(item.id) },
                     onClick = { onSelectItem(item) }
@@ -516,11 +563,12 @@ fun NetflixContentRow(
 }
 
 /**
- * Modern 2:3 Vertical Netflix Squircle Poster Card with Smooth D-Pad Lift & Glow
+ * Standard Netflix Landscape / Poster Card with Neon Border
  */
 @Composable
 fun NetflixPosterCard(
     item: MediaEntry,
+    neonGlowColor: Color,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
     onClick: () -> Unit,
@@ -535,123 +583,185 @@ fun NetflixPosterCard(
         label = "posterScale"
     )
 
-    Column(
+    Box(
         modifier = modifier
+            .width(180.dp)
+            .height(115.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
             }
-            .width(135.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(NetflixCard)
+            .border(
+                width = if (isFocused) 2.5.dp else 1.dp,
+                color = if (isFocused) neonGlowColor else Color(0x33FFFFFF),
+                shape = RoundedCornerShape(8.dp)
+            )
             .focusable(interactionSource = interactionSource)
-            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
-        verticalArrangement = Arrangement.spacedBy(5.dp)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(190.dp)
-                .shadow(if (isFocused) 16.dp else 2.dp, RoundedCornerShape(10.dp), spotColor = NetflixRed)
-                .clip(RoundedCornerShape(10.dp))
-                .background(NetflixCard)
-                .border(
-                    width = if (isFocused) 2.5.dp else 1.dp,
-                    color = if (isFocused) NetflixRed else Color(0x33475569),
-                    shape = RoundedCornerShape(10.dp)
-                )
-        ) {
-            val imgUrl = item.logo ?: item.backdrop
-            if (!imgUrl.isNullOrBlank()) {
-                AsyncImage(
-                    model = imgUrl,
-                    contentDescription = item.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(Brush.verticalGradient(listOf(Color(0xFF1E293B), Color(0xFF0F172A)))),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (item.type == Kind.SERIES) Icons.Default.Tv else (if (item.isVod) Icons.Default.Movie else Icons.Default.LiveTv),
-                        contentDescription = null,
-                        tint = Color(0x88FFFFFF),
-                        modifier = Modifier.size(36.dp)
-                    )
-                }
-            }
-
-            // Top Badges: Quality / Live / Rating
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(5.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                if (item.type == Kind.LIVE || item.type == Kind.PLUTO || item.type == Kind.SKY) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(NetflixRed)
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                    ) {
-                        Text("LIVE", color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black)
-                    }
-                } else if (item.year.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.Black.copy(alpha = 0.75f))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                    ) {
-                        Text(item.year, color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    Spacer(modifier = Modifier.width(1.dp))
-                }
-
-                if (item.rating.isNotBlank()) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(3.dp))
-                            .background(Color.Black.copy(alpha = 0.8f))
-                            .padding(horizontal = 4.dp, vertical = 1.dp)
-                    ) {
-                        Text(item.rating, color = AccentGold, fontSize = 8.5.sp, fontWeight = FontWeight.ExtraBold)
-                    }
-                }
-            }
-
-            // Bottom Gradient Label
+        val imgUrl = item.backdrop ?: item.logo
+        if (!imgUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = imgUrl,
+                contentDescription = item.title,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .align(Alignment.BottomCenter)
-                    .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.9f))))
-                    .padding(horizontal = 6.dp, vertical = 6.dp)
+                    .fillMaxSize()
+                    .background(Brush.verticalGradient(listOf(Color(0xFF1E1E24), Color(0xFF101014)))),
+                contentAlignment = Alignment.Center
             ) {
+                Icon(
+                    imageVector = if (item.type == Kind.SERIES) Icons.Default.Tv else Icons.Default.Movie,
+                    contentDescription = null,
+                    tint = Color(0x66FFFFFF),
+                    modifier = Modifier.size(32.dp)
+                )
+            }
+        }
+
+        // Dark Bottom Vignette Overlay
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)),
+                        startY = 40f
+                    )
+                )
+        )
+
+        // Quality Badge on Top Right
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(6.dp)
+                .clip(RoundedCornerShape(4.dp))
+                .background(Color.Black.copy(alpha = 0.8f))
+                .border(0.5.dp, neonGlowColor, RoundedCornerShape(4.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+        ) {
+            Text(
+                text = if (item.quality.isNotBlank()) item.quality else "HD",
+                color = Color.White,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Bottom Details (Title + Group)
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(horizontal = 8.dp, vertical = 6.dp)
+        ) {
+            Text(
+                text = item.title,
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            val subtext = if (item.genre.isNotBlank()) item.genre else item.group
+            if (subtext.isNotBlank()) {
                 Text(
-                    text = if (item.duration.isNotBlank()) item.duration else (if (item.genre.isNotBlank()) item.genre else (if (item.group.isNotBlank()) item.group else "Merlin TV")),
-                    color = Color(0xFFD4D4D8),
-                    fontSize = 9.5.sp,
-                    fontWeight = FontWeight.Medium,
+                    text = subtext,
+                    color = Color(0xFFA1A1AA),
+                    fontSize = 10.sp,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
         }
+    }
+}
 
-        // Title below poster
+/**
+ * Navigation Tab Pill
+ */
+@Composable
+fun NetflixNavTab(
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val containerColor = when {
+        isSelected -> Color.White
+        isFocused -> Color(0xFF2E2E38)
+        else -> Color.Transparent
+    }
+
+    val contentColor = when {
+        isSelected -> Color.Black
+        isFocused -> Color.White
+        else -> Color(0xFFC0C4CC)
+    }
+
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(containerColor)
+            .border(
+                width = if (isFocused && !isSelected) 2.dp else 0.dp,
+                color = if (isFocused) NetflixRed else Color.Transparent,
+                shape = RoundedCornerShape(20.dp)
+            )
+            .focusable(interactionSource = interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        contentAlignment = Alignment.Center
+    ) {
         Text(
-            text = item.title,
-            color = if (isFocused) Color.White else Color(0xFFE2E8F0),
-            fontSize = 11.5.sp,
-            fontWeight = if (isFocused) FontWeight.Bold else FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            text = label,
+            color = contentColor,
+            fontWeight = if (isSelected || isFocused) FontWeight.Bold else FontWeight.Medium,
+            fontSize = 13.sp
+        )
+    }
+}
+
+/**
+ * Top Icon Action Button
+ */
+@Composable
+fun NetflixIconButton(
+    icon: ImageVector,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    IconButton(
+        onClick = onClick,
+        interactionSource = interactionSource,
+        modifier = modifier
+            .size(36.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(if (isFocused) Color(0xFF2E2E38) else Color(0x66181820))
+            .border(
+                width = if (isFocused) 2.dp else 0.dp,
+                color = if (isFocused) NetflixRed else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (isFocused) NetflixRed else Color.White,
+            modifier = Modifier.size(18.dp)
         )
     }
 }

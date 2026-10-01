@@ -1,8 +1,8 @@
 {
-  "version": "2.2.0",
-  "versionCode": 220,
+  "version": "2.3.0",
+  "versionCode": 230,
   "downloadUrl": "https://github.com/merlinthedev848/merlin-tv/raw/main/merlin-tv-latest.apk",
-  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.2.0",
-  "releaseNotes": "Merlin TV v2.2.0: Netflix-Style Streaming Experience with Cinematic Hero Billboard, Top 10 Today horizontal rankings, 310+ blockbusters from ke1th.streams, 200+ FAST channels, TV series boxsets, and D-Pad remote squircle zoom.",
-  "publishedAt": "2026-09-27T13:00:00Z"
+  "releaseUrl": "https://github.com/merlinthedev848/merlin-tv/releases/tag/v2.3.0",
+  "releaseNotes": "Merlin TV v2.3.0: Pixel-perfect Netflix Cinematic Dashboard matching mockup with Giant Red Neon Outline Rank numbers (1-10), Full-Bleed Hero Billboard Spotlight, Neon Glow Movie Rails, 310+ Ke1th Blockbusters, Live FAST TV, and Squircle D-Pad navigation.",
+  "publishedAt": "2026-10-01T19:50:00Z"
 }

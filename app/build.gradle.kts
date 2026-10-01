@@ -14,8 +14,8 @@ android {
         applicationId = "com.example.merlinmedia"
         minSdk = 23
         targetSdk = 35
-        versionCode = 220
-        versionName = "2.2.0"
+        versionCode = 230
+        versionName = "2.3.0"
     }
 
     signingConfigs {
@@ -48,11 +48,11 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("merlinSigning")
+            signingConfig = signingConfigs.findByName("merlinSigning")?.takeIf { it.storeFile?.exists() == true } ?: signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("merlinSigning")
+            signingConfig = signingConfigs.findByName("merlinSigning")?.takeIf { it.storeFile?.exists() == true } ?: signingConfigs.getByName("debug")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

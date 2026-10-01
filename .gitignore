@@ -15,3 +15,7 @@ jdk/
 decoded_apk/
 decoded_apk_full/
 .kotlin/
+.DS_Store
+/captures
+.externalNativeBuild
+.cxx
