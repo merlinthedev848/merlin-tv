@@ -34,7 +34,7 @@ import com.example.merlinmedia.model.UpdateInfo
 import com.example.merlinmedia.ui.theme.*
 
 /**
- * Modern Netflix-Style Streaming Dashboard for Merlin TV.
+ * Modern Netflix-Style Streaming Dashboard for Merlin TV matching reference mockup.
  */
 @Composable
 fun NetflixDashboard(
@@ -62,55 +62,278 @@ fun NetflixDashboard(
     onSelectChannel: (MediaEntry, List<MediaEntry>) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Featured Hero Billboard Items (curated top blockbusters & series)
+    // 1. Curated Hero Billboard Item matching mockup (THE ALCHEMIST'S LEGACY)
+    val defaultHeroItem = remember {
+        MediaEntry(
+            id = "hero-alchemist-legacy",
+            title = "THE ALCHEMIST'S LEGACY",
+            url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+            type = Kind.MOVIE,
+            genre = "Action • Fantasy • Adventure",
+            year = "2025",
+            duration = "2h 15m",
+            rating = "8.9",
+            description = "A legendary wizard hunts a dangerous dark magic across centuries to protect a hidden world.",
+            isVod = true,
+            quality = "4K ULTRA HD",
+            backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=1600&q=85"
+        )
+    }
+
     val featuredCandidates = remember(movieChannels, seriesChannels) {
         val list = mutableListOf<MediaEntry>()
-        if (movieChannels.isNotEmpty()) list.addAll(movieChannels.take(5))
-        if (seriesChannels.isNotEmpty()) list.addAll(seriesChannels.take(3))
-        if (list.isEmpty()) {
-            list.add(
-                MediaEntry(
-                    id = "hero-default-1",
-                    title = "Tears of Steel",
-                    url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
-                    type = Kind.MOVIE,
-                    genre = "Sci-Fi • Action",
-                    year = "2025",
-                    duration = "1h 48m",
-                    rating = "8.9 ★",
-                    description = "In a dystopian future, scientists and warriors assemble in Amsterdam to save Earth from a rogue cyborg armada.",
-                    isVod = true,
-                    quality = "4K Ultra HD",
-                    backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80"
-                )
-            )
-        }
+        list.add(defaultHeroItem)
+        if (movieChannels.isNotEmpty()) list.addAll(movieChannels.take(4))
+        if (seriesChannels.isNotEmpty()) list.addAll(seriesChannels.take(2))
         list
     }
 
     var heroIndex by remember { mutableIntStateOf(0) }
-    val currentHeroItem = featuredCandidates.getOrElse(heroIndex % featuredCandidates.size) { featuredCandidates.first() }
+    val currentHeroItem = featuredCandidates.getOrElse(heroIndex % featuredCandidates.size) { defaultHeroItem }
 
     // Auto-cycle hero billboard safely
     LaunchedEffect(featuredCandidates.size) {
         while (true) {
-            kotlinx.coroutines.delay(10000)
+            kotlinx.coroutines.delay(12000)
             if (featuredCandidates.isNotEmpty()) {
                 heroIndex = (heroIndex + 1) % featuredCandidates.size
             }
         }
     }
 
-    // Top 10 items (combining top movies and top series)
-    val top10Items = remember(movieChannels, seriesChannels) {
+    // 2. Curated Top 10 Today Items matching mockup (Dungeon Kings, Starfall, The Witcher, Lost City, Ocean's End...)
+    val curatedTop10 = remember {
+        listOf(
+            MediaEntry(
+                id = "top10-dungeon-kings",
+                title = "DUNGEON KINGS",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                type = Kind.MOVIE,
+                genre = "Action, Fantasy",
+                year = "2025",
+                rating = "9.1 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-starfall",
+                title = "STARFALL",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                type = Kind.MOVIE,
+                genre = "Sci-Fi, Adventure",
+                year = "2025",
+                rating = "8.8 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-the-witcher",
+                title = "THE WITCHER",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                type = Kind.SERIES,
+                genre = "Fantasy, Drama",
+                year = "2024",
+                rating = "8.9 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-lost-city",
+                title = "LOST CITY",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                type = Kind.MOVIE,
+                genre = "Adventure, Action",
+                year = "2025",
+                rating = "8.6 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-oceans-end",
+                title = "OCEAN'S END",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+                type = Kind.MOVIE,
+                genre = "Documentary, Nature",
+                year = "2024",
+                rating = "9.0 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-cyberpunk-2099",
+                title = "CYBERPUNK 2099",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                type = Kind.MOVIE,
+                genre = "Sci-Fi, Cyberpunk",
+                year = "2025",
+                rating = "8.7 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-valhalla",
+                title = "VALHALLA",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                type = Kind.SERIES,
+                genre = "Action, Norse",
+                year = "2024",
+                rating = "8.8 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-shadow-realm",
+                title = "SHADOW REALM",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+                type = Kind.MOVIE,
+                genre = "Fantasy, Mystery",
+                year = "2025",
+                rating = "8.5 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-solaris",
+                title = "SOLARIS",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
+                type = Kind.MOVIE,
+                genre = "Sci-Fi, Space",
+                year = "2024",
+                rating = "8.9 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "top10-ironclad",
+                title = "IRONCLAD",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+                type = Kind.MOVIE,
+                genre = "Action, Medieval",
+                year = "2024",
+                rating = "8.4 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600&q=80",
+                logo = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600&q=80"
+            )
+        )
+    }
+
+    val top10Items = remember(curatedTop10, movieChannels, seriesChannels) {
         val list = mutableListOf<MediaEntry>()
-        val maxLen = maxOf(movieChannels.size, seriesChannels.size)
-        for (i in 0 until maxLen) {
-            if (i < movieChannels.size) list.add(movieChannels[i])
-            if (i < seriesChannels.size) list.add(seriesChannels[i])
-            if (list.size >= 10) break
-        }
-        list.take(10)
+        list.addAll(curatedTop10)
+        if (movieChannels.isNotEmpty()) list.addAll(movieChannels.take(5))
+        if (seriesChannels.isNotEmpty()) list.addAll(seriesChannels.take(3))
+        list.distinctBy { it.id }.take(10)
+    }
+
+    // 3. Curated Trending Blockbuster Movies matching mockup (Matrix, Dune, Avengers, Blade Runner, Oppenheimer, Interstellar)
+    val curatedBlockbusters = remember {
+        listOf(
+            MediaEntry(
+                id = "blockbuster-matrix",
+                title = "MATRIX",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4",
+                type = Kind.MOVIE,
+                genre = "Sci-Fi, Cyberpunk",
+                year = "2024",
+                rating = "9.2 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80",
+                logo = "https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?w=800&q=80"
+            ),
+            MediaEntry(
+                id = "blockbuster-dune",
+                title = "DUNE",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4",
+                type = Kind.MOVIE,
+                genre = "Sci-Fi, Epic",
+                year = "2024",
+                rating = "9.0 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=800&q=80",
+                logo = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=800&q=80"
+            ),
+            MediaEntry(
+                id = "blockbuster-avengers",
+                title = "AVENGERS",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+                type = Kind.MOVIE,
+                genre = "Action, Superhero",
+                year = "2024",
+                rating = "8.8 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=800&q=80",
+                logo = "https://images.unsplash.com/photo-1534447677768-be436bb09401?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "blockbuster-blade-runner",
+                title = "BLADE RUNNER",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+                type = Kind.MOVIE,
+                genre = "Sci-Fi, Noir",
+                year = "2024",
+                rating = "8.9 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=800&q=80",
+                logo = "https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "blockbuster-oppenheimer",
+                title = "OPPENHEIMER",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+                type = Kind.MOVIE,
+                genre = "Biography, Drama",
+                year = "2024",
+                rating = "9.1 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=800&q=80",
+                logo = "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=600&q=80"
+            ),
+            MediaEntry(
+                id = "blockbuster-interstellar",
+                title = "INTERSTELLAR",
+                url = "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4",
+                type = Kind.MOVIE,
+                genre = "Sci-Fi, Space",
+                year = "2024",
+                rating = "9.3 ★",
+                isVod = true,
+                quality = "4K",
+                backdrop = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=800&q=80",
+                logo = "https://images.unsplash.com/photo-1509281373149-e957c6296406?w=600&q=80"
+            )
+        )
+    }
+
+    val trendingBlockbusterList = remember(curatedBlockbusters, movieChannels) {
+        val list = mutableListOf<MediaEntry>()
+        list.addAll(curatedBlockbusters)
+        list.addAll(movieChannels)
+        list.distinctBy { it.id }
     }
 
     // Action & Sci-Fi list
@@ -146,334 +369,404 @@ fun NetflixDashboard(
         allCatalogItems.filter { favoriteIds.contains(it.id) }.distinctBy { it.id }
     }
 
-    Column(
+    // Full Root Layout with Left Navigation Rail and Main Streaming Area
+    Row(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFF0C0C0F))
-            .padding(horizontal = 24.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+            .background(Color(0xFF08080C))
     ) {
         // ==========================================
-        // 1. NETFLIX TOP NAVIGATION BAR
+        // 1. LEFT SLIM DOCK (Vertical Icon Rail)
         // ==========================================
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        NetflixLeftNavRail(
+            activeSection = NavSection.HOME,
+            onOpenSection = onOpenSection,
+            onOpenSettings = onOpenSettings
+        )
+
+        // ==========================================
+        // 2. MAIN CONTENT AREA
+        // ==========================================
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .padding(start = 14.dp, end = 20.dp, top = 8.dp, bottom = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // Left: Netflix-Style Merlin TV Logo & Navigation Links
+            // ==========================================
+            // TOP NAVIGATION BAR
+            // ==========================================
             Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                // Netflix-style Bold Red Logo Emblem
+                // Left: Netflix-Style Merlin TV Logo & Navigation Links
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.clickable { onOpenSection(NavSection.HOME) }
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // Netflix-style Bold Red Logo Emblem
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        modifier = Modifier.clickable { onOpenSection(NavSection.HOME) }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(NetflixRed),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "M",
+                                color = Color.White,
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Black
+                            )
+                        }
+
+                        Text(
+                            text = "MERLIN TV",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Black,
+                            letterSpacing = 1.1.sp
+                        )
+                    }
+
+                    // Navigation Pills: [ Home | Movies | TV Series | Live TV | EPG Guide | My List ]
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        NetflixNavTab(label = "Home", isSelected = true, onClick = {})
+                        NetflixNavTab(label = "Movies", isSelected = false, onClick = { onOpenSection(NavSection.MOVIES) })
+                        NetflixNavTab(label = "TV Series", isSelected = false, onClick = { onOpenSection(NavSection.SERIES) })
+                        NetflixNavTab(label = "Live TV", isSelected = false, onClick = { onOpenSection(NavSection.LIVE) })
+                        NetflixNavTab(label = "EPG Guide", isSelected = false, onClick = { onOpenSection(NavSection.EPG) })
+                        NetflixNavTab(label = "My List", isSelected = false, onClick = { onOpenSection(NavSection.FAVORITES) })
+                    }
+                }
+
+                // Right: Utility Actions (Notification Bell with Badge, Profile Avatar, Search, Clock, Update, Settings)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    // Search Action
+                    NetflixIconButton(icon = Icons.Default.Search, label = "Search", onClick = onOpenSearch)
+
+                    // Notification Bell with Red Dot Badge
                     Box(
                         modifier = Modifier
                             .size(34.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .background(NetflixRed),
+                            .background(Color(0x66181820))
+                            .clickable { onOpenNotices() },
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            text = "M",
-                            color = Color.White,
-                            fontSize = 22.sp,
-                            fontWeight = FontWeight.Black
+                        Icon(
+                            imageVector = Icons.Default.Notifications,
+                            contentDescription = "Notifications",
+                            tint = Color.White,
+                            modifier = Modifier.size(17.dp)
+                        )
+                        // Red Notification Badge Dot
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .align(Alignment.TopEnd)
+                                .offset(x = (-4).dp, y = 4.dp)
+                                .clip(CircleShape)
+                                .background(NetflixRed)
                         )
                     }
 
-                    Text(
-                        text = "MERLIN TV",
-                        color = Color.White,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.Black,
-                        letterSpacing = 1.2.sp
-                    )
-                }
+                    // Profile Avatar with Dropdown Arrow
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0x66181820))
+                            .clickable { onOpenAccount() }
+                            .padding(horizontal = 6.dp, vertical = 3.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFFE50914)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "M",
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Profile",
+                            tint = Color(0xFFA1A1AA),
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
 
-                // Netflix Nav Links: [ Home | Movies | Series | Live TV | My List | Catch Up ]
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    NetflixNavTab(label = "Home", isSelected = true, onClick = {})
-                    NetflixNavTab(label = "Movies (VOD)", isSelected = false, onClick = { onOpenSection(NavSection.MOVIES) })
-                    NetflixNavTab(label = "TV Series", isSelected = false, onClick = { onOpenSection(NavSection.SERIES) })
-                    NetflixNavTab(label = "Live TV", isSelected = false, onClick = { onOpenSection(NavSection.LIVE) })
-                    NetflixNavTab(label = "EPG Guide", isSelected = false, onClick = { onOpenSection(NavSection.EPG) })
-                    NetflixNavTab(label = "My List", isSelected = false, onClick = { onOpenSection(NavSection.FAVORITES) })
-                }
-            }
-
-            // Right: Utility Actions (Search, Clock, Update, Settings)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Search Action
-                NetflixIconButton(icon = Icons.Default.Search, label = "Search", onClick = onOpenSearch)
-
-                // Live Clock Pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFF1E1E24))
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                ) {
-                    Text(
-                        text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
-                        color = Color(0xFFD4D4D8),
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-
-                // Update Action
-                if (availableUpdate != null) {
+                    // Live Clock Pill
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(NetflixRed)
-                            .border(1.dp, Color.White, RoundedCornerShape(8.dp))
-                            .clickable { onOpenUpdate() }
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFF181820))
                             .padding(horizontal = 10.dp, vertical = 5.dp)
                     ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        Text(
+                            text = if (currentTime.isNotBlank()) currentTime else "Merlin TV",
+                            color = Color(0xFFD4D4D8),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+
+                    // Update Action
+                    if (availableUpdate != null) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(NetflixRed)
+                                .border(1.dp, Color.White, RoundedCornerShape(8.dp))
+                                .clickable { onOpenUpdate() }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
-                            Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Color.White, modifier = Modifier.size(14.dp))
-                            Text("UPDATE", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(Icons.Default.SystemUpdate, contentDescription = null, tint = Color.White, modifier = Modifier.size(13.dp))
+                                Text("UPDATE", color = Color.White, fontSize = 9.5.sp, fontWeight = FontWeight.Black)
+                            }
                         }
                     }
-                } else {
-                    NetflixIconButton(icon = Icons.Default.SystemUpdate, label = "Update", onClick = onOpenUpdate)
+
+                    // Settings Action
+                    NetflixIconButton(icon = Icons.Default.Settings, label = "Settings", onClick = onOpenSettings)
                 }
-
-                // Settings
-                NetflixIconButton(icon = Icons.Default.Settings, label = "Settings", onClick = onOpenSettings)
-            }
-        }
-
-        // ==========================================
-        // 2. NETFLIX SCROLLABLE STREAMING FEED
-        // ==========================================
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 20.dp)
-        ) {
-            // Section A: Hero Spotlight Billboard
-            item(key = "netflix_hero_billboard") {
-                NetflixHeroBillboard(
-                    item = currentHeroItem,
-                    isFavorite = favoriteIds.contains(currentHeroItem.id),
-                    onToggleFavorite = { onToggleFavorite(currentHeroItem.id) },
-                    onPlay = {
-                        val playlist = if (currentHeroItem.type == Kind.SERIES) seriesChannels else movieChannels
-                        onSelectChannel(currentHeroItem, playlist)
-                    },
-                    onMoreInfo = {
-                        if (currentHeroItem.type == Kind.SERIES) {
-                            onSelectSeriesForEpisodes(currentHeroItem)
-                        } else {
-                            onSelectMovieForDetails(currentHeroItem)
-                        }
-                    }
-                )
             }
 
-            // Section B: Continue Watching / History
-            if (recentHistory.isNotEmpty()) {
-                item(key = "netflix_continue_watching") {
-                    NetflixContentRow(
-                        title = "🕒 Continue Watching",
-                        icon = Icons.Default.History,
-                        badgeText = "${recentHistory.size} items",
-                        items = recentHistory.take(12),
-                        favoriteIds = favoriteIds,
-                        onToggleFavorite = onToggleFavorite,
-                        onSelectItem = { item ->
-                            if (item.type == Kind.SERIES) onSelectSeriesForEpisodes(item)
-                            else if (item.type == Kind.MOVIE) onSelectMovieForDetails(item)
-                            else onSelectChannel(item, recentHistory)
+            // ==========================================
+            // SCROLLABLE STREAMING FEED
+            // ==========================================
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                contentPadding = PaddingValues(bottom = 16.dp)
+            ) {
+                // Section A: Hero Spotlight Billboard
+                item(key = "netflix_hero_billboard") {
+                    NetflixHeroBillboard(
+                        item = currentHeroItem,
+                        isFavorite = favoriteIds.contains(currentHeroItem.id),
+                        onToggleFavorite = { onToggleFavorite(currentHeroItem.id) },
+                        onPlay = {
+                            val playlist = if (currentHeroItem.type == Kind.SERIES) seriesChannels else movieChannels
+                            onSelectChannel(currentHeroItem, playlist.ifEmpty { listOf(currentHeroItem) })
+                        },
+                        onMoreInfo = {
+                            if (currentHeroItem.type == Kind.SERIES) {
+                                onSelectSeriesForEpisodes(currentHeroItem)
+                            } else {
+                                onSelectMovieForDetails(currentHeroItem)
+                            }
                         }
                     )
                 }
-            }
 
-            // Section C: Top 10 on Merlin TV Today (Numbered Posters)
-            if (top10Items.isNotEmpty()) {
-                item(key = "netflix_top_10_row") {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier.padding(horizontal = 4.dp)
+                // Section B: Top 10 Today (Giant Glowing Red Neon Numbers + Posters)
+                if (top10Items.isNotEmpty()) {
+                    item(key = "netflix_top_10_row") {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Icon(Icons.Default.Whatshot, contentDescription = null, tint = NetflixRed, modifier = Modifier.size(18.dp))
                             Text(
-                                text = "Top 10 on Merlin TV Today",
+                                text = "Top 10 Today",
                                 color = Color.White,
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
-                                letterSpacing = 0.3.sp
+                                letterSpacing = 0.3.sp,
+                                modifier = Modifier.padding(horizontal = 4.dp)
                             )
-                        }
 
-                        LazyRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            contentPadding = PaddingValues(horizontal = 4.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            itemsIndexed(top10Items, key = { index, it -> "top10-${it.id}-$index" }) { index, item ->
-                                NetflixTop10PosterCard(
-                                    rank = index + 1,
-                                    item = item,
-                                    isFavorite = favoriteIds.contains(item.id),
-                                    onToggleFavorite = { onToggleFavorite(item.id) },
-                                    onClick = {
-                                        if (item.type == Kind.SERIES) onSelectSeriesForEpisodes(item)
-                                        else onSelectMovieForDetails(item)
-                                    }
-                                )
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                itemsIndexed(top10Items, key = { index, it -> "top10-${it.id}-$index" }) { index, item ->
+                                    NetflixTop10PosterCard(
+                                        rank = index + 1,
+                                        item = item,
+                                        isFavorite = favoriteIds.contains(item.id),
+                                        onToggleFavorite = { onToggleFavorite(item.id) },
+                                        onClick = {
+                                            if (item.type == Kind.SERIES) onSelectSeriesForEpisodes(item)
+                                            else onSelectMovieForDetails(item)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
-            // Section D: Trending Movies (VOD)
-            if (movieChannels.isNotEmpty()) {
-                item(key = "netflix_trending_movies") {
-                    NetflixContentRow(
-                        title = "🍿 Trending Blockbuster Movies",
-                        icon = Icons.Default.Movie,
-                        badgeText = "Explore All (${movieChannels.size}) >",
-                        items = movieChannels.take(15),
-                        favoriteIds = favoriteIds,
-                        onToggleFavorite = onToggleFavorite,
-                        onSelectItem = { onSelectMovieForDetails(it) }
-                    )
+                // Section C: Trending Blockbuster Movies (Matrix, Dune, Avengers, Blade Runner, Oppenheimer...)
+                if (trendingBlockbusterList.isNotEmpty()) {
+                    item(key = "netflix_trending_blockbusters") {
+                        NetflixContentRow(
+                            title = "Trending Blockbuster Movies",
+                            icon = Icons.Default.Movie,
+                            badgeText = "Explore All (${trendingBlockbusterList.size}) >",
+                            items = trendingBlockbusterList.take(15),
+                            favoriteIds = favoriteIds,
+                            onToggleFavorite = onToggleFavorite,
+                            onSelectItem = { onSelectMovieForDetails(it) }
+                        )
+                    }
+                }
+
+                // Section D: Continue Watching / History
+                if (recentHistory.isNotEmpty()) {
+                    item(key = "netflix_continue_watching") {
+                        NetflixContentRow(
+                            title = "Continue Watching",
+                            icon = Icons.Default.History,
+                            badgeText = "${recentHistory.size} items",
+                            items = recentHistory.take(12),
+                            favoriteIds = favoriteIds,
+                            onToggleFavorite = onToggleFavorite,
+                            onSelectItem = { item ->
+                                if (item.type == Kind.SERIES) onSelectSeriesForEpisodes(item)
+                                else if (item.type == Kind.MOVIE) onSelectMovieForDetails(item)
+                                else onSelectChannel(item, recentHistory)
+                            }
+                        )
+                    }
+                }
+
+                // Section E: Binge-Worthy TV Series
+                if (seriesChannels.isNotEmpty()) {
+                    item(key = "netflix_binge_series") {
+                        NetflixContentRow(
+                            title = "Binge-Worthy TV Series",
+                            icon = Icons.Default.Tv,
+                            badgeText = "Explore All (${seriesChannels.size}) >",
+                            items = seriesChannels.take(15),
+                            favoriteIds = favoriteIds,
+                            onToggleFavorite = onToggleFavorite,
+                            onSelectItem = { onSelectSeriesForEpisodes(it) }
+                        )
+                    }
+                }
+
+                // Section F: Action, Sci-Fi & Fantasy
+                if (actionSciFiItems.isNotEmpty()) {
+                    item(key = "netflix_action_scifi") {
+                        NetflixContentRow(
+                            title = "Action, Sci-Fi & Fantasy",
+                            icon = Icons.Default.Bolt,
+                            items = actionSciFiItems,
+                            favoriteIds = favoriteIds,
+                            onToggleFavorite = onToggleFavorite,
+                            onSelectItem = { onSelectMovieForDetails(it) }
+                        )
+                    }
+                }
+
+                // Section G: Live TV Channels & Top Broadcasts
+                if (liveTopPicks.isNotEmpty()) {
+                    item(key = "netflix_live_picks") {
+                        NetflixContentRow(
+                            title = "Live TV Channels & Top Broadcasts",
+                            icon = Icons.Default.LiveTv,
+                            badgeText = "All Channels >",
+                            items = liveTopPicks.take(15),
+                            favoriteIds = favoriteIds,
+                            onToggleFavorite = onToggleFavorite,
+                            onSelectItem = { onSelectChannel(it, liveTopPicks) }
+                        )
+                    }
+                }
+
+                // Section H: Classic Cinema & Timeless Favourites
+                if (classicDramaItems.isNotEmpty()) {
+                    item(key = "netflix_classic_drama") {
+                        NetflixContentRow(
+                            title = "Classic Cinema & Timeless Favourites",
+                            icon = Icons.Default.TheaterComedy,
+                            items = classicDramaItems,
+                            favoriteIds = favoriteIds,
+                            onToggleFavorite = onToggleFavorite,
+                            onSelectItem = { onSelectMovieForDetails(it) }
+                        )
+                    }
+                }
+
+                // Section I: My Watchlist / Favorites
+                if (myFavoritesList.isNotEmpty()) {
+                    item(key = "netflix_my_favorites") {
+                        NetflixContentRow(
+                            title = "My Watchlist",
+                            icon = Icons.Default.Star,
+                            badgeText = "${myFavoritesList.size} saved",
+                            items = myFavoritesList,
+                            favoriteIds = favoriteIds,
+                            onToggleFavorite = onToggleFavorite,
+                            onSelectItem = { item ->
+                                if (item.type == Kind.SERIES) onSelectSeriesForEpisodes(item)
+                                else if (item.type == Kind.MOVIE) onSelectMovieForDetails(item)
+                                else onSelectChannel(item, myFavoritesList)
+                            }
+                        )
+                    }
                 }
             }
 
-            // Section E: Binge-Worthy TV Series
-            if (seriesChannels.isNotEmpty()) {
-                item(key = "netflix_binge_series") {
-                    NetflixContentRow(
-                        title = "📺 Binge-Worthy TV Series",
-                        icon = Icons.Default.Tv,
-                        badgeText = "Explore All (${seriesChannels.size}) >",
-                        items = seriesChannels.take(15),
-                        favoriteIds = favoriteIds,
-                        onToggleFavorite = onToggleFavorite,
-                        onSelectItem = { onSelectSeriesForEpisodes(it) }
-                    )
-                }
-            }
-
-            // Section F: Action, Sci-Fi & Thrillers
-            if (actionSciFiItems.isNotEmpty()) {
-                item(key = "netflix_action_scifi") {
-                    NetflixContentRow(
-                        title = "⚡ Action, Sci-Fi & Fantasy",
-                        icon = Icons.Default.Bolt,
-                        items = actionSciFiItems,
-                        favoriteIds = favoriteIds,
-                        onToggleFavorite = onToggleFavorite,
-                        onSelectItem = { onSelectMovieForDetails(it) }
-                    )
-                }
-            }
-
-            // Section G: Live Broadcast TV & FAST Streams
-            if (liveTopPicks.isNotEmpty()) {
-                item(key = "netflix_live_picks") {
-                    NetflixContentRow(
-                        title = "📡 Live TV Channels & Top Broadcasts",
-                        icon = Icons.Default.LiveTv,
-                        badgeText = "All Channels >",
-                        items = liveTopPicks.take(15),
-                        favoriteIds = favoriteIds,
-                        onToggleFavorite = onToggleFavorite,
-                        onSelectItem = { onSelectChannel(it, liveTopPicks) }
-                    )
-                }
-            }
-
-            // Section H: Classic Cinema & Drama
-            if (classicDramaItems.isNotEmpty()) {
-                item(key = "netflix_classic_drama") {
-                    NetflixContentRow(
-                        title = "🎭 Classic Cinema & Timeless Favourites",
-                        icon = Icons.Default.TheaterComedy,
-                        items = classicDramaItems,
-                        favoriteIds = favoriteIds,
-                        onToggleFavorite = onToggleFavorite,
-                        onSelectItem = { onSelectMovieForDetails(it) }
-                    )
-                }
-            }
-
-            // Section I: My Watchlist / Favorites
-            if (myFavoritesList.isNotEmpty()) {
-                item(key = "netflix_my_favorites") {
-                    NetflixContentRow(
-                        title = "⭐ My Watchlist",
-                        icon = Icons.Default.Star,
-                        badgeText = "${myFavoritesList.size} saved",
-                        items = myFavoritesList,
-                        favoriteIds = favoriteIds,
-                        onToggleFavorite = onToggleFavorite,
-                        onSelectItem = { item ->
-                            if (item.type == Kind.SERIES) onSelectSeriesForEpisodes(item)
-                            else if (item.type == Kind.MOVIE) onSelectMovieForDetails(item)
-                            else onSelectChannel(item, myFavoritesList)
-                        }
-                    )
-                }
-            }
-        }
-
-        // ==========================================
-        // 3. BOTTOM UTILITY BAR (ACCOUNT, MULTI, CATCHUP, RADIO, SETTINGS)
-        // ==========================================
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+            // ==========================================
+            // BOTTOM PILL QUICK UTILITIES
+            // ==========================================
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                BottomPillButton(label = "ACCOUNT", icon = Icons.Default.AccountCircle, onClick = onOpenAccount)
-                BottomPillButton(label = "CATCH UP", icon = Icons.Default.History, onClick = onOpenCatchUp)
-                BottomPillButton(label = "SPORTS", icon = Icons.Default.SportsSoccer, onClick = onOpenSports)
-            }
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BottomPillButton(label = "ACCOUNT", icon = Icons.Default.AccountCircle, onClick = onOpenAccount)
+                    BottomPillButton(label = "CATCH UP", icon = Icons.Default.History, onClick = onOpenCatchUp)
+                    BottomPillButton(label = "SPORTS", icon = Icons.Default.SportsSoccer, onClick = onOpenSports)
+                }
 
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BottomPillButton(label = "RADIO", icon = Icons.Default.Radio, onClick = { onOpenSection(NavSection.RADIO) })
-                BottomPillButton(label = "NOTICES", icon = Icons.Default.Email, onClick = onOpenNotices)
-                BottomPillButton(label = "SETTINGS", icon = Icons.Default.Settings, onClick = onOpenSettings)
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    BottomPillButton(label = "RADIO", icon = Icons.Default.Radio, onClick = { onOpenSection(NavSection.RADIO) })
+                    BottomPillButton(label = "NOTICES", icon = Icons.Default.Email, onClick = onOpenNotices)
+                    BottomPillButton(label = "SETTINGS", icon = Icons.Default.Settings, onClick = onOpenSettings)
+                }
             }
         }
     }
 }
+
 

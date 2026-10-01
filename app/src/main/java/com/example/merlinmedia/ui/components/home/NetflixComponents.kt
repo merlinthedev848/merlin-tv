@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.merlinmedia.model.Kind
 import com.example.merlinmedia.model.MediaEntry
+import com.example.merlinmedia.model.NavSection
 import com.example.merlinmedia.ui.theme.*
 
 /**
@@ -761,6 +762,130 @@ fun NetflixIconButton(
             imageVector = icon,
             contentDescription = label,
             tint = if (isFocused) NetflixRed else Color.White,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+/**
+ * Slim Left Navigation Rail (Vertical Dock) matching reference mockup
+ */
+@Composable
+fun NetflixLeftNavRail(
+    activeSection: NavSection,
+    onOpenSection: (NavSection) -> Unit,
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .width(48.dp)
+            .fillMaxHeight()
+            .background(Color(0xFF08080B))
+            .padding(vertical = 12.dp, horizontal = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Top Nav Rail Icons
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Home (Red squircle when active)
+            LeftNavRailItem(
+                icon = Icons.Default.Home,
+                label = "Home",
+                isSelected = activeSection == NavSection.HOME,
+                onClick = { onOpenSection(NavSection.HOME) }
+            )
+
+            // Movies (VOD)
+            LeftNavRailItem(
+                icon = Icons.Default.Movie,
+                label = "Movies",
+                isSelected = activeSection == NavSection.MOVIES,
+                onClick = { onOpenSection(NavSection.MOVIES) }
+            )
+
+            // TV Series
+            LeftNavRailItem(
+                icon = Icons.Default.Tv,
+                label = "TV Series",
+                isSelected = activeSection == NavSection.SERIES,
+                onClick = { onOpenSection(NavSection.SERIES) }
+            )
+
+            // Live TV / Antenna
+            LeftNavRailItem(
+                icon = Icons.Default.LiveTv,
+                label = "Live TV",
+                isSelected = activeSection == NavSection.LIVE,
+                onClick = { onOpenSection(NavSection.LIVE) }
+            )
+
+            // My List / Bookmark
+            LeftNavRailItem(
+                icon = Icons.Default.Bookmark,
+                label = "My List",
+                isSelected = activeSection == NavSection.FAVORITES,
+                onClick = { onOpenSection(NavSection.FAVORITES) }
+            )
+        }
+
+        // Bottom Menu / Settings Expander
+        LeftNavRailItem(
+            icon = Icons.Default.Menu,
+            label = "Menu",
+            isSelected = false,
+            onClick = onOpenSettings
+        )
+    }
+}
+
+/**
+ * Item for Left Navigation Rail
+ */
+@Composable
+private fun LeftNavRailItem(
+    icon: ImageVector,
+    label: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val isFocused by interactionSource.collectIsFocusedAsState()
+
+    val scale by animateFloatAsState(
+        targetValue = if (isFocused) 1.15f else 1.0f,
+        label = "navRailScale"
+    )
+
+    Box(
+        modifier = modifier
+            .size(36.dp)
+            .scale(scale)
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                when {
+                    isSelected -> NetflixRed
+                    isFocused -> Color(0xFF282832)
+                    else -> Color.Transparent
+                }
+            )
+            .border(
+                width = if (isFocused && !isSelected) 1.5.dp else 0.dp,
+                color = if (isFocused) Color.White else Color.Transparent,
+                shape = RoundedCornerShape(8.dp)
+            )
+            .focusable(interactionSource = interactionSource)
+            .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = label,
+            tint = if (isSelected || isFocused) Color.White else Color(0xFF71717A),
             modifier = Modifier.size(18.dp)
         )
     }
