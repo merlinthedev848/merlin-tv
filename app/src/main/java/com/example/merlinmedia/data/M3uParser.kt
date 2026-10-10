@@ -109,12 +109,11 @@ object M3uParser {
             } else if (
                 line.startsWith("http://", ignoreCase = true) ||
                 line.startsWith("https://", ignoreCase = true) ||
-                line.startsWith("rtsp://", ignoreCase = true) ||
-                line.startsWith("rtmp://", ignoreCase = true) ||
-                line.startsWith("mms://", ignoreCase = true)
+                line.startsWith("rtsp://", ignoreCase = true)
             ) {
+                val cleanUrl = line.replace(" ", "%20")
                 val lowerTitle = currentTitle.lowercase()
-                val lowerLine = line.lowercase()
+                val lowerLine = cleanUrl.lowercase()
 
                 // 1. Filter out known dead or geoblocked streams
                 val isDeadOrBlocked = DEAD_OR_BLOCKED_MARKERS.any { marker ->
@@ -139,13 +138,13 @@ object M3uParser {
                     }
 
                     val cleanTitle = cleanChannelTitle(currentTitle).ifBlank { "Channel ${entries.size + 1}" }
-                    val entryId = if (currentId.isNotBlank()) currentId else "$cleanTitle-$line".hashCode().toString()
+                    val entryId = if (currentId.isNotBlank()) currentId else "$cleanTitle-$cleanUrl".hashCode().toString()
 
                     entries.add(
                         MediaEntry(
                             id = entryId,
                             title = cleanTitle,
-                            url = line,
+                            url = cleanUrl,
                             type = defaultKind,
                             country = currentCountry,
                             group = currentGroup.ifBlank { "General" },

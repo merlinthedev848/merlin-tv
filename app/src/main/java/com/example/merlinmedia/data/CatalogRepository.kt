@@ -140,8 +140,9 @@ object CatalogRepository {
                 if (rawName.isBlank()) continue
                 val rawType = obj.optString("type")
                 val category = obj.optString("category").ifBlank { "Feature" }
-                val streamUrl = obj.optString("streamUrl").trim()
-                if (streamUrl.isBlank()) continue
+                val rawStreamUrl = obj.optString("streamUrl").trim()
+                if (rawStreamUrl.isBlank()) continue
+                val streamUrl = rawStreamUrl.replace(" ", "%20")
                 val logo = obj.optString("logo").ifBlank { null }
 
                 val yearMatch = Regex("""\((\d{4})\)""").find(rawName)
@@ -187,8 +188,9 @@ object CatalogRepository {
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
                 val name = obj.optString("name").trim()
-                val streamUrl = obj.optString("streamUrl").trim()
-                if (name.isBlank() || streamUrl.isBlank()) continue
+                val rawStreamUrl = obj.optString("streamUrl").trim()
+                if (name.isBlank() || rawStreamUrl.isBlank()) continue
+                val streamUrl = rawStreamUrl.replace(" ", "%20")
                 val category = obj.optString("category").ifBlank { "General" }
                 val logo = obj.optString("logo").ifBlank { null }
 

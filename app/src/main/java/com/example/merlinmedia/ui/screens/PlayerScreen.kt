@@ -37,6 +37,7 @@ import com.example.merlinmedia.ui.dialogs.AudioAndSubtitleDialog
 import com.example.merlinmedia.ui.dialogs.SleepTimerDialog
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 @Composable
 fun PlayerScreen(
@@ -90,25 +91,47 @@ fun PlayerScreen(
         }
     }
 
+    val isPlayerReleased = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+    var reconnectJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+
     // Initialize ExoPlayer
     val player = remember {
         ExoPlayerHelper.createPlayer(context, lowLatencyMode = true)
     }
 
     fun playItem(item: MediaEntry, resetRetry: Boolean = true) {
+        if (isPlayerReleased.get()) return
         currentItem = item
-        errorMessage = null
-        isBuffering = true
         if (resetRetry) {
+            reconnectJob?.cancel()
             reconnectAttempt = 0
             isAutoReconnecting = false
         }
-        player.stop()
-        player.clearMediaItems()
-        player.setMediaItem(ExoPlayerHelper.buildMediaItem(item.url, item.title))
-        ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
-        player.prepare()
-        player.playWhenReady = true
+
+        val url = item.url.trim()
+        if (url.isBlank()) {
+            isBuffering = false
+            errorMessage = "Invalid or missing stream link for \"${item.title}\""
+            showControls = true
+            return
+        }
+
+        try {
+            errorMessage = null
+            isBuffering = true
+            player.stop()
+            player.clearMediaItems()
+            val mediaItem = ExoPlayerHelper.buildMediaItem(url, item.title)
+            player.setMediaItem(mediaItem)
+            ExoPlayerHelper.setPlaybackSpeed(player, playbackSpeed)
+            player.prepare()
+            player.playWhenReady = true
+        } catch (e: Throwable) {
+            Timber.e(e, "Exception while playing item: ${item.title} ($url)")
+            isBuffering = false
+            errorMessage = "Playback failed: ${e.message ?: "Stream unreachable"}"
+            showControls = true
+        }
     }
 
     // Numeric keypad auto-jump timer (1.2s timeout)
@@ -134,7 +157,7 @@ fun PlayerScreen(
                 sleepTimerRemainingMinutes -= 1
                 if (sleepTimerRemainingMinutes <= 0) {
                     isPlaying = false
-                    player.pause()
+                    runCatching { player.pause() }
                 }
             }
         }
@@ -152,6 +175,7 @@ fun PlayerScreen(
     DisposableEffect(player) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
+                if (isPlayerReleased.get()) return
                 when (playbackState) {
                     Player.STATE_BUFFERING -> {
                         isBuffering = true
@@ -170,25 +194,40 @@ fun PlayerScreen(
             }
 
             override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
+                if (!isPlayerReleased.get()) {
+                    isPlaying = playing
+                }
             }
 
             override fun onPlayerError(error: PlaybackException) {
                 isBuffering = false
+                Timber.e(error, "ExoPlayer error occurred: ${error.errorCodeName} (${error.errorCode})")
+                if (isPlayerReleased.get()) return
+
                 if (reconnectAttempt < 3) {
                     val nextAttempt = reconnectAttempt + 1
                     reconnectAttempt = nextAttempt
                     isAutoReconnecting = true
                     errorMessage = null
-                    coroutineScope.launch {
+                    reconnectJob?.cancel()
+                    reconnectJob = coroutineScope.launch {
                         delay(2000)
-                        if (isAutoReconnecting) {
+                        if (!isPlayerReleased.get() && isAutoReconnecting) {
                             playItem(currentItem, resetRetry = false)
                         }
                     }
                 } else {
                     isAutoReconnecting = false
-                    errorMessage = "Stream disconnected: ${error.message ?: "Broadcast offline or geo-restricted"}"
+                    val readableMessage = when (error.errorCode) {
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_FAILED,
+                        PlaybackException.ERROR_CODE_IO_NETWORK_CONNECTION_TIMEOUT -> "Network connection failed or stream timed out."
+                        PlaybackException.ERROR_CODE_IO_BAD_HTTP_STATUS -> "Server returned HTTP error (404/403/500)."
+                        PlaybackException.ERROR_CODE_PARSING_CONTAINER_MALFORMED,
+                        PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED -> "Stream format or manifest is corrupted."
+                        PlaybackException.ERROR_CODE_DECODER_INIT_FAILED -> "Hardware decoder failed to initialize for this format."
+                        else -> error.message ?: "Broadcast offline or geo-restricted"
+                    }
+                    errorMessage = "Stream unavailable: $readableMessage"
                     showControls = true
                 }
             }
@@ -196,8 +235,14 @@ fun PlayerScreen(
         player.addListener(listener)
 
         onDispose {
-            player.removeListener(listener)
-            player.release()
+            isPlayerReleased.set(true)
+            reconnectJob?.cancel()
+            runCatching {
+                player.removeListener(listener)
+                player.stop()
+                player.clearMediaItems()
+                player.release()
+            }
         }
     }
 
@@ -250,7 +295,7 @@ fun PlayerScreen(
                             if (numericChannelInput.isNotEmpty()) {
                                 val channelNumber = numericChannelInput.toIntOrNull()
                                 if (channelNumber != null) {
-                                    val targetIndex = (channelNumber - 101).coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
+                                    val targetIndex = channelNumber - 101
                                     if (targetIndex in playlist.indices) {
                                         playItem(playlist[targetIndex])
                                     }
@@ -296,15 +341,15 @@ fun PlayerScreen(
                             }
                         }
                         KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
-                            if (player.isPlaying) player.pause() else player.play()
+                            runCatching { if (player.isPlaying) player.pause() else player.play() }
                             true
                         }
                         KeyEvent.KEYCODE_MEDIA_PLAY -> {
-                            player.play()
+                            runCatching { player.play() }
                             true
                         }
                         KeyEvent.KEYCODE_MEDIA_PAUSE -> {
-                            player.pause()
+                            runCatching { player.pause() }
                             true
                         }
                         else -> false
@@ -399,7 +444,7 @@ fun PlayerScreen(
                     playbackSpeed = playbackSpeed,
                     aspectMode = aspectMode,
                     onTogglePlayPause = {
-                        if (player.isPlaying) player.pause() else player.play()
+                        runCatching { if (player.isPlaying) player.pause() else player.play() }
                     },
                     onPrevious = {
                         val prevIdx = if (currentIndex - 1 < 0) playlist.size - 1 else currentIndex - 1
