@@ -215,6 +215,11 @@ object CatalogRepository {
     // ==========================================
     // DISK CACHING WITH TTL FOR INSTANT OFFLINE
     // ==========================================
+    private val cacheLocks = java.util.concurrent.ConcurrentHashMap<String, Any>()
+
+    private fun getLockForCategory(category: String): Any =
+        cacheLocks.computeIfAbsent(category) { Any() }
+
     private fun getCacheFile(context: Context, categoryName: String): File {
         val cacheDir = File(context.cacheDir, "catalogs")
         if (!cacheDir.exists()) cacheDir.mkdirs()
@@ -222,88 +227,107 @@ object CatalogRepository {
     }
 
     private fun saveToDiskCache(context: Context, categoryName: String, items: List<MediaEntry>) {
-        runCatching {
-            val file = getCacheFile(context, categoryName)
-            val root = JSONObject()
-            root.put("timestamp", System.currentTimeMillis())
-            val jsonArray = JSONArray()
-            items.forEach { entry ->
-                val obj = JSONObject().apply {
-                    put("id", entry.id)
-                    put("title", entry.title)
-                    put("url", entry.url)
-                    put("type", entry.type.name)
-                    put("country", entry.country)
-                    put("group", entry.group)
-                    put("logo", entry.logo ?: "")
-                    put("description", entry.description)
-                    put("source", entry.source)
-                    put("year", entry.year)
-                    put("duration", entry.duration)
-                    put("genre", entry.genre)
-                    put("rating", entry.rating)
-                    if (entry.season != null) put("season", entry.season)
-                    if (entry.episode != null) put("episode", entry.episode)
-                    put("backdrop", entry.backdrop ?: "")
-                    put("isVod", entry.isVod)
-                    put("quality", entry.quality)
-                    put("tvgId", entry.tvgId)
+        synchronized(getLockForCategory(categoryName)) {
+            runCatching {
+                val file = getCacheFile(context, categoryName)
+                val tempFile = File(file.parentFile, "${file.name}.${System.currentTimeMillis()}.tmp")
+                val root = JSONObject()
+                root.put("timestamp", System.currentTimeMillis())
+                val jsonArray = JSONArray()
+                items.forEach { entry ->
+                    val obj = JSONObject().apply {
+                        put("id", entry.id)
+                        put("title", entry.title)
+                        put("url", entry.url)
+                        put("type", entry.type.name)
+                        put("country", entry.country)
+                        put("group", entry.group)
+                        put("logo", entry.logo ?: "")
+                        put("description", entry.description)
+                        put("source", entry.source)
+                        put("year", entry.year)
+                        put("duration", entry.duration)
+                        put("genre", entry.genre)
+                        put("rating", entry.rating)
+                        if (entry.season != null) put("season", entry.season)
+                        if (entry.episode != null) put("episode", entry.episode)
+                        put("backdrop", entry.backdrop ?: "")
+                        put("isVod", entry.isVod)
+                        put("quality", entry.quality)
+                        put("tvgId", entry.tvgId)
+                    }
+                    jsonArray.put(obj)
                 }
-                jsonArray.put(obj)
+                root.put("items", jsonArray)
+                tempFile.writeText(root.toString())
+                if (tempFile.exists()) {
+                    if (file.exists()) file.delete()
+                    val renamed = tempFile.renameTo(file)
+                    if (!renamed) {
+                        tempFile.copyTo(file, overwrite = true)
+                        tempFile.delete()
+                    }
+                }
+            }.onFailure { e ->
+                Timber.e(e, "Failed atomic disk write for catalog: $categoryName")
             }
-            root.put("items", jsonArray)
-            file.writeText(root.toString())
         }
     }
 
     private fun loadFromDiskCache(context: Context, categoryName: String, ignoreTtl: Boolean = false): List<MediaEntry> {
-        return runCatching {
-            val file = getCacheFile(context, categoryName)
-            if (!file.exists()) return emptyList()
-            val content = file.readText()
-            if (content.isBlank()) return emptyList()
+        synchronized(getLockForCategory(categoryName)) {
+            return runCatching {
+                val file = getCacheFile(context, categoryName)
+                if (!file.exists()) return emptyList()
+                val content = file.readText()
+                if (content.isBlank()) return emptyList()
 
-            val jsonArray: JSONArray
-            if (content.trim().startsWith("{")) {
-                val root = JSONObject(content)
-                val timestamp = root.optLong("timestamp", 0L)
-                if (!ignoreTtl && (System.currentTimeMillis() - timestamp > CACHE_TTL_MS)) {
-                    return emptyList()
+                val jsonArray: JSONArray
+                if (content.trim().startsWith("{")) {
+                    val root = JSONObject(content)
+                    val timestamp = root.optLong("timestamp", 0L)
+                    if (!ignoreTtl && (System.currentTimeMillis() - timestamp > CACHE_TTL_MS)) {
+                        return emptyList()
+                    }
+                    jsonArray = root.optJSONArray("items") ?: return emptyList()
+                } else {
+                    jsonArray = JSONArray(content)
                 }
-                jsonArray = root.optJSONArray("items") ?: return emptyList()
-            } else {
-                jsonArray = JSONArray(content)
-            }
 
-            val list = mutableListOf<MediaEntry>()
-            for (i in 0 until jsonArray.length()) {
-                val obj = jsonArray.getJSONObject(i)
-                list.add(
-                    MediaEntry(
-                        id = obj.optString("id"),
-                        title = obj.optString("title"),
-                        url = obj.optString("url"),
-                        type = runCatching { Kind.valueOf(obj.optString("type")) }.getOrDefault(Kind.LIVE),
-                        country = obj.optString("country"),
-                        group = obj.optString("group"),
-                        logo = obj.optString("logo").ifBlank { null },
-                        description = obj.optString("description"),
-                        source = obj.optString("source"),
-                        year = obj.optString("year"),
-                        duration = obj.optString("duration"),
-                        genre = obj.optString("genre"),
-                        rating = obj.optString("rating"),
-                        season = if (obj.has("season")) obj.optInt("season") else null,
-                        episode = if (obj.has("episode")) obj.optInt("episode") else null,
-                        backdrop = obj.optString("backdrop").ifBlank { null },
-                        isVod = obj.optBoolean("isVod", false),
-                        quality = obj.optString("quality", "1080p"),
-                        tvgId = obj.optString("tvgId")
+                val list = mutableListOf<MediaEntry>()
+                for (i in 0 until jsonArray.length()) {
+                    val obj = jsonArray.getJSONObject(i)
+                    list.add(
+                        MediaEntry(
+                            id = obj.optString("id"),
+                            title = obj.optString("title"),
+                            url = obj.optString("url"),
+                            type = runCatching { Kind.valueOf(obj.optString("type")) }.getOrDefault(Kind.LIVE),
+                            country = obj.optString("country"),
+                            group = obj.optString("group"),
+                            logo = obj.optString("logo").ifBlank { null },
+                            description = obj.optString("description"),
+                            source = obj.optString("source"),
+                            year = obj.optString("year"),
+                            duration = obj.optString("duration"),
+                            genre = obj.optString("genre"),
+                            rating = obj.optString("rating"),
+                            season = if (obj.has("season")) obj.optInt("season") else null,
+                            episode = if (obj.has("episode")) obj.optInt("episode") else null,
+                            backdrop = obj.optString("backdrop").ifBlank { null },
+                            isVod = obj.optBoolean("isVod", false),
+                            quality = obj.optString("quality", "1080p"),
+                            tvgId = obj.optString("tvgId")
+                        )
                     )
-                )
+                }
+                list
+            }.getOrElse { e ->
+                Timber.w(e, "Corrupted cache file detected for $categoryName, purging")
+                runCatching { getCacheFile(context, categoryName).delete() }
+                emptyList()
             }
-            list
-        }.getOrDefault(emptyList())
+        }
     }
 
     /**

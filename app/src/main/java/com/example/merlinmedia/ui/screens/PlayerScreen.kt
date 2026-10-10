@@ -117,7 +117,7 @@ fun PlayerScreen(
             delay(1200L)
             val channelNumber = numericChannelInput.toIntOrNull()
             if (channelNumber != null) {
-                val targetIndex = (channelNumber - 101).coerceIn(0, (playlist.size - 1).coerceAtLeast(0))
+                val targetIndex = channelNumber - 101
                 if (targetIndex in playlist.indices) {
                     playItem(playlist[targetIndex])
                 }

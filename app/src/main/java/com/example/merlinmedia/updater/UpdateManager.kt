@@ -112,8 +112,13 @@ object UpdateManager {
         onProgress: (progressPercent: Int, bytesDownloaded: Long, totalBytes: Long) -> Unit
     ): Result<File> = withContext(Dispatchers.IO) {
         runCatching {
+            val sanitizedVersion = info.version.replace(Regex("[^a-zA-Z0-9._-]"), "_")
             val updatesDir = File(context.getExternalFilesDir(null), "updates").apply { mkdirs() }
-            val targetFile = File(updatesDir, "merlin-tv-${info.version}.apk")
+            val targetFile = File(updatesDir, "merlin-tv-$sanitizedVersion.apk")
+            if (!targetFile.canonicalPath.startsWith(updatesDir.canonicalPath)) {
+                throw SecurityException("Invalid target file path traversal attempt")
+            }
+            val tempFile = File(updatesDir, "merlin-tv-$sanitizedVersion.apk.tmp")
 
             val request = Request.Builder()
                 .url(info.apkUrl)
@@ -133,28 +138,55 @@ object UpdateManager {
             }
             val contentLength = body.contentLength()
 
-            response.use {
-                body.byteStream().use { input ->
-                    FileOutputStream(targetFile).use { output ->
-                        val buffer = ByteArray(8192)
-                        var bytesRead: Int
-                        var totalRead: Long = 0
+            try {
+                response.use {
+                    body.byteStream().use { input ->
+                        FileOutputStream(tempFile).use { output ->
+                            val buffer = ByteArray(8192)
+                            var bytesRead: Int
+                            var totalRead: Long = 0
 
-                        while (input.read(buffer).also { bytesRead = it } != -1) {
-                            output.write(buffer, 0, bytesRead)
-                            totalRead += bytesRead
-                            val progress = if (contentLength > 0) {
-                                ((totalRead * 100) / contentLength).toInt()
-                            } else {
-                                -1
+                            while (input.read(buffer).also { bytesRead = it } != -1) {
+                                output.write(buffer, 0, bytesRead)
+                                totalRead += bytesRead
+                                val progress = if (contentLength > 0) {
+                                    ((totalRead * 100) / contentLength).toInt()
+                                } else {
+                                    -1
+                                }
+                                onProgress(progress, totalRead, contentLength)
                             }
-                            onProgress(progress, totalRead, contentLength)
+                            output.flush()
+
+                            if (contentLength > 0 && totalRead != contentLength) {
+                                throw IllegalStateException("Download incomplete: expected $contentLength bytes but got $totalRead")
+                            }
                         }
-                        output.flush()
                     }
                 }
+
+                if (targetFile.exists()) {
+                    targetFile.delete()
+                }
+                if (!tempFile.renameTo(targetFile)) {
+                    tempFile.copyTo(targetFile, overwrite = true)
+                    tempFile.delete()
+                }
+
+                // Verify package archive integrity
+                val archiveInfo = context.packageManager.getPackageArchiveInfo(targetFile.absolutePath, 0)
+                if (archiveInfo == null) {
+                    targetFile.delete()
+                    throw IllegalStateException("Downloaded APK is corrupted or invalid package archive")
+                }
+
+                targetFile
+            } catch (t: Throwable) {
+                if (tempFile.exists()) {
+                    tempFile.delete()
+                }
+                throw t
             }
-            targetFile
         }
     }
 

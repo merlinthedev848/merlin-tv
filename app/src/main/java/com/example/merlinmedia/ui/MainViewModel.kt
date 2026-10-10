@@ -12,7 +12,9 @@ import com.example.merlinmedia.model.MediaEntry
 import com.example.merlinmedia.model.UpdateInfo
 import com.example.merlinmedia.updater.UpdateManager
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -100,9 +102,15 @@ class MainViewModel @Inject constructor(
         }
     }
 
+    private var loadJob: Job? = null
+
     fun loadChannels(forceRefresh: Boolean = false) {
+        if (!forceRefresh && loadJob?.isActive == true) {
+            return
+        }
+        loadJob?.cancel()
         _isLoading.value = true
-        viewModelScope.launch {
+        loadJob = viewModelScope.launch {
             try {
                 val ctx = getApplication<Application>()
                 val result = CatalogRepository.loadAllCatalogs(ctx, forceRefresh = forceRefresh)
@@ -111,6 +119,9 @@ class MainViewModel @Inject constructor(
                 if (result.sky.isNotEmpty()) _skyChannels.value = result.sky
                 if (result.movies.isNotEmpty()) _movieChannels.value = result.movies
                 if (result.series.isNotEmpty()) _seriesChannels.value = result.series
+            } catch (e: CancellationException) {
+                Timber.d("loadChannels job was cancelled")
+                throw e
             } catch (e: Throwable) {
                 Timber.e(e, "Failed to load catalogs")
             } finally {
